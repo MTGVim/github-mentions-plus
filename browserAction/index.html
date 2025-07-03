@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Mentions+ Settings</title>
+    <link href="style.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>GitHub Mentions+</h1>
+        <p class="subtitle">Enhance GitHub @mention autocomplete</p>
+      </header>
+
+      <main>
+        <section class="settings-section">
+          <h2>Endpoint Configuration</h2>
+          
+          <div class="form-group">
+            <label for="endpointUrl">Endpoint URL</label>
+            <input 
+              type="url" 
+              id="endpointUrl" 
+              placeholder="https://your-endpoint.com/users.json"
+              class="form-control"
+            />
+            <small class="help-text">
+              Your endpoint must return a JSON array of user objects with <code>username</code>, <code>name</code> and <code>avatar</code> fields.
+            </small>
+          </div>
+
+          <div class="form-group">
+            <button id="testEndpoint" class="btn btn-secondary">
+              Test Endpoint
+            </button>
+            <button id="refreshUsers" class="btn btn-primary">
+              Refresh User List
+            </button>
+          </div>
+
+          <div id="endpointStatus" class="status-indicator hidden">
+            <div class="status-icon"></div>
+            <span class="status-text"></span>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h2>Extension Status</h2>
+          
+          <div class="status-grid">
+            <div class="status-item">
+              <span class="status-label">Extension:</span>
+              <span id="extensionStatus" class="status-value">Loading...</span>
+            </div>
+            
+            <div class="status-item">
+              <span class="status-label">Cached Users:</span>
+              <span id="cachedUsersCount" class="status-value">Loading...</span>
+            </div>
+            
+            <div class="status-item">
+              <span class="status-label">Cache Status:</span>
+              <span id="cacheStatus" class="status-value">Loading...</span>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <button id="saveSettings" class="btn btn-primary btn-full">
+          Save Settings
+        </button>
+      </footer>
+    </div>
+
+    <script src="../utils/storage.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
