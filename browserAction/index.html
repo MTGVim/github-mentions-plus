@@ -15,28 +15,82 @@
 
       <main>
         <section class="settings-section">
-          <h2>Endpoint Configuration</h2>
+          <h2>Data Source Configuration</h2>
           
           <div class="form-group">
-            <label for="endpointUrl">Endpoint URL</label>
-            <input 
-              type="url" 
-              id="endpointUrl" 
-              placeholder="https://your-endpoint.com/users.json"
-              class="form-control"
-            />
-            <small class="help-text">
-              Your endpoint must return a JSON array of user objects with <code>username</code>, <code>name</code> and <code>avatar</code> fields.
-            </small>
+            <label>Data Source</label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="dataSource" value="endpoint" checked />
+                <span class="radio-label">HTTP Endpoint</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="dataSource" value="direct" />
+                <span class="radio-label">Direct JSON Input</span>
+              </label>
+            </div>
           </div>
 
-          <div class="form-group">
-            <button id="testEndpoint" class="btn btn-secondary">
-              Test Endpoint
-            </button>
-            <button id="refreshUsers" class="btn btn-primary">
-              Refresh User List
-            </button>
+          <!-- Endpoint Configuration -->
+          <div id="endpointSection" class="data-source-section">
+            <h3>Endpoint Configuration</h3>
+            <div class="form-group">
+              <label for="endpointUrl">Endpoint URL</label>
+              <input 
+                type="url" 
+                id="endpointUrl" 
+                placeholder="https://your-endpoint.com/users.json"
+                class="form-control"
+              />
+              <small class="help-text">
+                Your endpoint must return a JSON array of user objects with <code>username</code>, <code>name</code> and <code>avatar</code> fields.
+              </small>
+            </div>
+
+            <div class="form-group">
+              <button id="testEndpoint" class="btn btn-secondary">
+                Test Endpoint
+              </button>
+              <button id="refreshUsers" class="btn btn-primary">
+                Refresh User List
+              </button>
+            </div>
+          </div>
+
+          <!-- Direct JSON Input -->
+          <div id="directJsonSection" class="data-source-section hidden">
+            <h3>Direct JSON Input</h3>
+            <div class="form-group">
+              <label for="directJsonData">User Data (JSON)</label>
+              <textarea 
+                id="directJsonData" 
+                placeholder='[
+  {
+    "username": "john-doe",
+    "name": "John Doe",
+    "avatar": "https://example.com/avatar.jpg"
+  },
+  {
+    "username": "jane-smith",
+    "name": "Jane Smith"
+  }
+]'
+                class="form-control json-textarea"
+                rows="12"
+              ></textarea>
+              <small class="help-text">
+                Enter JSON array of user objects. Each user must have <code>username</code> and <code>name</code> fields. <code>avatar</code> is optional.
+              </small>
+            </div>
+
+            <div class="form-group">
+              <button id="validateJson" class="btn btn-secondary">
+                Validate JSON
+              </button>
+              <button id="loadDirectUsers" class="btn btn-primary">
+                Load Users
+              </button>
+            </div>
           </div>
 
           <div id="endpointStatus" class="status-indicator hidden">
@@ -52,6 +106,11 @@
             <div class="status-item">
               <span class="status-label">Extension:</span>
               <span id="extensionStatus" class="status-value">Loading...</span>
+            </div>
+            
+            <div class="status-item">
+              <span class="status-label">Data Source:</span>
+              <span id="dataSourceStatus" class="status-value">Loading...</span>
             </div>
             
             <div class="status-item">
