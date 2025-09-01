@@ -1,15 +1,22 @@
 /**
  * GitHub Mentions+ Settings Popup Script
- * Handles settings management and endpoint testing
+ * Handles settings management, endpoint testing, and direct JSON input
  */
 
 // DOM elements
+const dataSourceRadios = document.querySelectorAll('input[name="dataSource"]');
+const endpointSection = document.getElementById('endpointSection');
+const directJsonSection = document.getElementById('directJsonSection');
 const endpointUrlInput = document.getElementById('endpointUrl');
+const directJsonData = document.getElementById('directJsonData');
 const testEndpointBtn = document.getElementById('testEndpoint');
 const refreshUsersBtn = document.getElementById('refreshUsers');
+const validateJsonBtn = document.getElementById('validateJson');
+const loadDirectUsersBtn = document.getElementById('loadDirectUsers');
 const saveSettingsBtn = document.getElementById('saveSettings');
 const endpointStatus = document.getElementById('endpointStatus');
 const extensionStatus = document.getElementById('extensionStatus');
+const dataSourceStatus = document.getElementById('dataSourceStatus');
 const cachedUsersCount = document.getElementById('cachedUsersCount');
 const cacheStatus = document.getElementById('cacheStatus');
 
@@ -29,6 +36,9 @@ async function initialize() {
     
     // Add event listeners
     setupEventListeners();
+    
+    // Show appropriate section based on current data source
+    updateDataSourceSection();
     
   } catch (error) {
     // Silently handle initialization errors
@@ -54,7 +64,37 @@ async function loadSettings() {
  */
 function updateUI() {
   if (currentSettings) {
-    endpointUrlInput.value = currentSettings.endpointUrl || '';
+    // Set data source radio button
+    const dataSource = currentSettings.dataSource || 'endpoint';
+    document.querySelector(`input[name="dataSource"][value="${dataSource}"]`).checked = true;
+    
+    // Set endpoint URL if exists
+    if (currentSettings.endpointUrl) {
+      endpointUrlInput.value = currentSettings.endpointUrl;
+    }
+    
+    // Set direct JSON data if exists
+    if (currentSettings.directJsonData) {
+      directJsonData.value = currentSettings.directJsonData;
+    }
+    
+    // Update section visibility
+    updateDataSourceSection();
+  }
+}
+
+/**
+ * Update data source section visibility
+ */
+function updateDataSourceSection() {
+  const selectedDataSource = document.querySelector('input[name="dataSource"]:checked').value;
+  
+  if (selectedDataSource === 'endpoint') {
+    endpointSection.classList.remove('hidden');
+    directJsonSection.classList.add('hidden');
+  } else {
+    endpointSection.classList.add('hidden');
+    directJsonSection.classList.remove('hidden');
   }
 }
 
@@ -63,8 +103,12 @@ function updateUI() {
  */
 async function saveSettings() {
   try {
+    const selectedDataSource = document.querySelector('input[name="dataSource"]:checked').value;
+    
     const newSettings = {
-      endpointUrl: endpointUrlInput.value.trim(),
+      dataSource: selectedDataSource,
+      endpointUrl: selectedDataSource === 'endpoint' ? endpointUrlInput.value.trim() : '',
+      directJsonData: selectedDataSource === 'direct' ? directJsonData.value.trim() : '',
       enabled: true
     };
     
@@ -155,6 +199,104 @@ async function testEndpoint() {
 }
 
 /**
+ * Validate JSON input
+ */
+function validateJson() {
+  const jsonText = directJsonData.value.trim();
+  if (!jsonText) {
+    showError('Please enter JSON data');
+    return;
+  }
+
+  try {
+    const data = JSON.parse(jsonText);
+    
+    if (!Array.isArray(data)) {
+      showError('JSON must be an array');
+      return;
+    }
+    
+    if (data.length === 0) {
+      showError('JSON array cannot be empty');
+      return;
+    }
+    
+    // Validate each user object
+    const validUsers = data.filter(user => 
+      user && typeof user === 'object' &&
+      typeof user.username === 'string' &&
+      typeof user.name === 'string' &&
+      (user.avatar === undefined || typeof user.avatar === 'string')
+    );
+    
+    if (validUsers.length !== data.length) {
+      showError(`Found ${data.length - validUsers.length} invalid user objects`);
+      return;
+    }
+    
+    if (validUsers.length === 0) {
+      showError('No valid user data found');
+      return;
+    }
+    
+    showSuccess(`JSON validation successful! Found ${validUsers.length} valid users.`);
+    
+  } catch (error) {
+    showError(`Invalid JSON format: ${error.message}`);
+  }
+}
+
+/**
+ * Load users from direct JSON input
+ */
+async function loadDirectUsers() {
+  const jsonText = directJsonData.value.trim();
+  if (!jsonText) {
+    showError('Please enter JSON data');
+    return;
+  }
+
+  loadDirectUsersBtn.disabled = true;
+  loadDirectUsersBtn.textContent = 'Loading...';
+
+  try {
+    const data = JSON.parse(jsonText);
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Invalid JSON data');
+    }
+    
+    // Validate user data structure
+    const validUsers = data.filter(user => 
+      user && typeof user === 'object' &&
+      typeof user.username === 'string' &&
+      typeof user.name === 'string' &&
+      (user.avatar === undefined || typeof user.avatar === 'string')
+    );
+    
+    if (validUsers.length === 0) {
+      throw new Error('No valid user data found');
+    }
+    
+    // Cache the users
+    const success = await window.GitHubMentionsStorage.setCachedUsers(validUsers);
+    if (success) {
+      showSuccess(`Successfully loaded ${validUsers.length} users from JSON input`);
+      updateStatus();
+    } else {
+      showError('Failed to cache user data - storage error');
+    }
+    
+  } catch (error) {
+    console.error('Load direct users error:', error);
+    showError(`Failed to load users: ${error.message}`);
+  } finally {
+    loadDirectUsersBtn.disabled = false;
+    loadDirectUsersBtn.textContent = 'Load Users';
+  }
+}
+
+/**
  * Refresh user list from endpoint
  */
 async function refreshUsers() {
@@ -239,6 +381,11 @@ async function updateStatus() {
       extensionStatus.textContent = 'Active';
       extensionStatus.className = 'status-value success';
       
+      // Update data source status
+      const dataSource = settings.dataSource || 'endpoint';
+      dataSourceStatus.textContent = dataSource === 'endpoint' ? 'HTTP Endpoint' : 'Direct JSON';
+      dataSourceStatus.className = 'status-value success';
+      
       // Update cache status
       const cachedUsers = await window.GitHubMentionsStorage.getCachedUsers();
       if (cachedUsers && cachedUsers.length > 0) {
@@ -298,6 +445,11 @@ function showLoading(message) {
  * Setup event listeners
  */
 function setupEventListeners() {
+  // Data source radio buttons
+  dataSourceRadios.forEach(radio => {
+    radio.addEventListener('change', updateDataSourceSection);
+  });
+  
   // Save settings button
   saveSettingsBtn.addEventListener('click', saveSettings);
   
@@ -307,10 +459,22 @@ function setupEventListeners() {
   // Refresh users button
   refreshUsersBtn.addEventListener('click', refreshUsers);
   
-  // Enter key on input
+  // Validate JSON button
+  validateJsonBtn.addEventListener('click', validateJson);
+  
+  // Load direct users button
+  loadDirectUsersBtn.addEventListener('click', loadDirectUsers);
+  
+  // Enter key on inputs
   endpointUrlInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       saveSettings();
+    }
+  });
+  
+  directJsonData.addEventListener('keypress', (e) => {
+    if (e.ctrlKey && e.key === 'Enter') {
+      loadDirectUsers();
     }
   });
 }

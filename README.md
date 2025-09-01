@@ -1,6 +1,6 @@
 # GitHub Mentions+ Extension
 
-A browser extension that enhances GitHub's native @mention autocomplete by adding custom user suggestions from configurable endpoints.
+A browser extension that enhances GitHub's native @mention autocomplete by adding custom user suggestions from configurable endpoints or direct JSON input.
 
 ## Problem Statement
 
@@ -15,7 +15,7 @@ GitHub's native @mention autocomplete only suggests users that the current user 
 GitHub Mentions+ augments GitHub's native @mention autocomplete by:
 
 1. **Listening** for @ mentions in GitHub textareas and contenteditable elements
-2. **Fetching** custom user suggestions from a user-configurable endpoint
+2. **Fetching** custom user suggestions from a user-configurable endpoint OR direct JSON input
 3. **Displaying** suggestions in a native-looking overlay that complements GitHub's existing UI
 4. **Caching** results to minimize API calls and improve performance
 
@@ -27,7 +27,7 @@ GitHub Mentions+ augments GitHub's native @mention autocomplete by:
 2. Open Chrome/Edge and navigate to `chrome://extensions/`
 3. Enable "Developer mode"
 4. Click "Load unpacked" and select the extension directory
-5. Click the extension icon to configure your endpoint
+5. Click the extension icon to configure your data source
 6. Start using @mentions on GitHub!
 7. The extension will be installed and active on GitHub pages
 
@@ -35,13 +35,16 @@ GitHub Mentions+ augments GitHub's native @mention autocomplete by:
 
 1. Download the extension from the browser store (coming soon)
 2. Install the extension
-3. Click the extension icon to configure your endpoint
+3. Click the extension icon to configure your data source
 4. Start using @mentions on GitHub!
 
 ## Configuration
 
-### Endpoint Setup
+### Data Source Options
 
+The extension supports two ways to provide user data:
+
+#### Option 1: HTTP Endpoint
 Your endpoint must return a JSON array of user objects in this format:
 
 ```json
@@ -65,19 +68,32 @@ Your endpoint must return a JSON array of user objects in this format:
 **Optional fields:**
 - `avatar` - Avatar URL (string). If not provided, will be fetched from GitHub
 
+#### Option 2: Direct JSON Input
+Enter your user data directly in the extension settings:
+
+1. Select "Direct JSON Input" as your data source
+2. Paste your JSON data in the text area
+3. Click "Validate JSON" to check format
+4. Click "Load Users" to cache the data
+
 ### Settings Configuration
 
 1. Click the extension icon in your browser toolbar
-2. Enter your endpoint URL in the "Endpoint URL" field
-3. Click "Test Endpoint" to verify connectivity
+2. Choose your preferred data source (HTTP Endpoint or Direct JSON Input)
+3. Configure your chosen data source:
+   - **HTTP Endpoint**: Enter URL and test connectivity
+   - **Direct JSON**: Paste JSON data and validate
 4. Click "Save Settings" to apply the configuration
-5. Use "Refresh User List" to manually update the cache
+5. Use "Refresh User List" or "Load Users" to update the cache
 
 ## Features
 
+- **Dual Data Sources**: Support for both HTTP endpoints and direct JSON input
 - Seamless integration with GitHub's native UI
 - Positioned below GitHub's overlay when visible
 - Fetches missing avatars from GitHub's public API
 - Respects GitHub's rate limits (60 requests/hour)
+- Real-time JSON validation for direct input
+- Automatic data source switching
 
 **Note**: This extension is not affiliated with GitHub Inc. It's a third-party tool designed to enhance the GitHub experience. 
