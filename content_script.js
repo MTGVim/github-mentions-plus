@@ -338,7 +338,6 @@ function onInput(e) {
  * @param {HTMLElement} input - Input element to activate
  */
 function activateInput(input) {
-  if (!input || input.dataset.mentionEnhanced) return;
 
   try {
     activeInput = input;
