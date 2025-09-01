@@ -365,7 +365,14 @@ function activateInput(input) {
 function scanInputs() {
   try {
     const inputs = document.querySelectorAll('textarea, [contenteditable="true"]');
-    inputs.forEach(activateInput);
+    const activeInput = document.activeElement;
+    inputs.forEach(input => {
+      if(input.id === activeInput.id) {
+        activateInput(input);
+      } else {
+        input.dataset.mentionEnhanced = 'false';
+      }
+    });
   } catch (error) {
     // Silently handle scanning errors
   }
