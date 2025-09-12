@@ -229,6 +229,42 @@ window.GitHubMentionsAPI.enhanceUsersWithAvatars = async function(users) {
 };
 
 /**
+ * Fetch random LGTM image from LGTM Reloaded API
+ * @returns {Promise<{success: boolean, imageUrl?: string, message?: string}>} LGTM result
+ */
+window.GitHubMentionsAPI.fetchRandomLGTM = async function() {
+  try {
+    const response = await fetchWithTimeout('https://us-central1-lgtm-reloaded.cloudfunctions.net/lgtm', {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`LGTM API request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    if (data && data.imageUrl) {
+      return {
+        success: true,
+        imageUrl: data.imageUrl
+      };
+    } else {
+      throw new Error('Invalid response format from LGTM API');
+    }
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to fetch LGTM image: ${error.message}`
+    };
+  }
+};
+
+/**
  * Test endpoint connectivity
  * @param {string} endpointUrl - Endpoint URL to test
  * @returns {Promise<{success: boolean, message: string, userCount?: number}>} Test result

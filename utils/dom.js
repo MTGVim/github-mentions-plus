@@ -21,6 +21,8 @@ window.GitHubMentionsDOM = {};
 
 let overlay = null;
 let lastGoodPosition = null;
+let selectedIndex = 0;
+let overlayItems = [];
 
 /**
  * Create the mentions overlay element
@@ -149,33 +151,45 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
     name: '#4f5863'
   };
 
-  // Clear existing content
+  // Clear existing content and reset selection
   overlay.innerHTML = '';
+  selectedIndex = 0;
+  overlayItems = [];
 
   // Create suggestion items
-  users.slice(0, 4).forEach(user => {
+  users.slice(0, 4).forEach((user, index) => {
     const item = document.createElement('div');
     item.className = 'github-mentions-item';
+    const isSelected = index === selectedIndex;
+    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const selectedBgColor = isDarkMode ? '#1f6feb' : '#0969da';
+    const defaultBgColor = 'transparent';
+    
     item.style.cssText = `
       display: flex;
       align-items: center;
       padding: 0.5rem;
       cursor: pointer;
       transition: background-color 0.1s ease;
-      background-color: transparent;
+      background-color: ${isSelected ? selectedBgColor : defaultBgColor};
       border-radius: 0.375rem;
       margin: 0 0.5rem;
       list-style: none;
     `;
+    
+    // Store user data and index for keyboard navigation
+    item.userData = user;
+    item.itemIndex = index;
+    overlayItems.push(item);
 
     // Add hover effects
     item.addEventListener('mouseenter', () => {
-      const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      item.style.backgroundColor = isDarkMode ? '#151a20' : '#f6f8fa';
+      selectedIndex = index;
+      updateSelection();
     });
     
     item.addEventListener('mouseleave', () => {
-      item.style.backgroundColor = 'transparent';
+      // Keep selection when mouse leaves
     });
 
     // Add mousedown handler
@@ -191,28 +205,6 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
       window.GitHubMentionsDOM.hideOverlay();
     });
 
-    // Create avatar element
-    const avatar = document.createElement('img');
-    avatar.src = user.avatar || `https://github.com/${user.username}.png`;
-    avatar.alt = `${user.name}'s avatar`;
-    avatar.style.cssText = `
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      box-shadow: 0 0 0 1px #d0d7de;
-      display: inline-block;
-      line-height: 1;
-      overflow: hidden;
-      vertical-align: middle;
-      margin-right: 0.5rem;
-      flex-shrink: 0;
-    `;
-
-    // Handle avatar load errors
-    avatar.addEventListener('error', () => {
-      avatar.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMTAiIGZpbGw9IiNkNmQ3ZGUiLz4KPHBhdGggZD0iTTEwIDEwQzEyLjc2MTQgMTAgMTUgNy43NjE0MiAxNSA1QzE1IDIuMjM4NTggMTIuNzYxNCAwIDEwIDBDNy4yMzg1OCAwIDUgMi4yMzg1OCA1IDVDNSA3Ljc2MTQyIDcuMjM4NTggMTAgMTAgMTBaIiBmaWxsPSIjNjc2MDZhIi8+CjxwYXRoIGQ9Ik0xMCAxMkM2LjY4NiAxMiA0IDE0LjY4NiA0IDE4VjIwSDE2VjE4QzE2IDE0LjY4NiAxMy4zMTQgMTIgMTAgMTJaIiBmaWxsPSIjNjc2MDZhIi8+Cjwvc3ZnPgo=';
-    });
-
     // Create text content
     const textContent = document.createElement('div');
     textContent.style.cssText = `
@@ -223,8 +215,74 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
       flex: 1;
     `;
 
+    // Check if this is a command (has isCommand property)
+    const isCommand = user.isCommand;
+
+    if (!isCommand) {
+      // Create avatar element only for user mentions, not commands
+      const avatar = document.createElement('img');
+      avatar.src = user.avatar || `https://github.com/${user.username}.png`;
+      avatar.alt = `${user.name}'s avatar`;
+      avatar.style.cssText = `
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        box-shadow: 0 0 0 1px #d0d7de;
+        display: inline-block;
+        line-height: 1;
+        overflow: hidden;
+        vertical-align: middle;
+        margin-right: 0.5rem;
+        flex-shrink: 0;
+      `;
+
+      // Handle avatar load errors
+      avatar.addEventListener('error', () => {
+        avatar.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMTAiIGZpbGw9IiNkNmQ3ZGUiLz4KPHBhdGggZD0iTTEwIDEwQzEyLjc2MTQgMTAgMTUgNy43NjE0MiAxNSA1QzE1IDIuMjM4NTggMTIuNzYxNCAwIDEwIDBDNy4yMzg1OCAwIDUgMi4yMzg1OCA1IDVDNSA3Ljc2MTQyIDcuMjM4NTggMTAgMTAgMTBaIiBmaWxsPSIjNjc2MDZhIi8+CjxwYXRoIGQ9Ik0xMCAxMkM2LjY4NiAxMiA0IDE0LjY4NiA0IDE4VjIwSDE2VjE4QzE2IDE0LjY4NiAxMy4zMTQgMTIgMTAgMTJaIiBmaWxsPSIjNjc2MDZhIi8+Cjwvc3ZnPgo=';
+      });
+
+      item.appendChild(avatar);
+    } else {
+      // For commands, show emoji if available, otherwise show command icon
+      const commandIcon = document.createElement('span');
+      
+      if (user.emoji) {
+        // Show emoji
+        commandIcon.textContent = user.emoji;
+        commandIcon.style.cssText = `
+          width: 16px;
+          height: 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          margin-right: 0.5rem;
+          flex-shrink: 0;
+        `;
+      } else {
+        // Show default command icon
+        commandIcon.textContent = '!';
+        commandIcon.style.cssText = `
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background-color: ${colors.username};
+          color: ${isDarkMode ? '#04080d' : '#ffffff'};
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          font-weight: bold;
+          margin-right: 0.5rem;
+          flex-shrink: 0;
+        `;
+      }
+
+      item.appendChild(commandIcon);
+    }
+
     const username = document.createElement('span');
-    username.textContent = user.username;
+    username.textContent = isCommand ? `!${user.username}` : user.username;
     username.style.cssText = `
       color: ${colors.username};
       font-family: -apple-system, "system-ui", "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
@@ -246,7 +304,6 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
     textContent.appendChild(username);
     textContent.appendChild(name);
 
-    item.appendChild(avatar);
     item.appendChild(textContent);
     overlay.appendChild(item);
   });
@@ -261,11 +318,30 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
 };
 
 /**
+ * Update the selection highlighting in the overlay
+ */
+function updateSelection() {
+  const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const selectedBgColor = isDarkMode ? '#1f6feb' : '#0969da';
+  const defaultBgColor = 'transparent';
+  
+  overlayItems.forEach((item, index) => {
+    if (index === selectedIndex) {
+      item.style.backgroundColor = selectedBgColor;
+    } else {
+      item.style.backgroundColor = defaultBgColor;
+    }
+  });
+}
+
+/**
  * Hide the overlay
  */
 window.GitHubMentionsDOM.hideOverlay = function() {
   if (overlay) {
     overlay.style.display = 'none';
+    selectedIndex = 0;
+    overlayItems = [];
     
     // Restore GitHub's overlay border radius to fully rounded when our overlay is hidden
     const githubOverlay = document.querySelector('[class*="AutocompleteSuggestions-module__Overlay"]');
@@ -300,6 +376,56 @@ window.GitHubMentionsDOM.removeOverlay = function() {
  */
 window.GitHubMentionsDOM.getOverlay = function() {
   return overlay;
+};
+
+/**
+ * Handle keyboard navigation in the overlay
+ * @param {KeyboardEvent} e - Keyboard event
+ * @returns {boolean} True if event was handled
+ */
+window.GitHubMentionsDOM.handleKeyNavigation = function(e) {
+  if (!overlay || overlay.style.display === 'none' || overlayItems.length === 0) {
+    return false;
+  }
+  
+  switch (e.key) {
+    case 'ArrowDown':
+      e.preventDefault();
+      selectedIndex = (selectedIndex + 1) % overlayItems.length;
+      updateSelection();
+      return true;
+      
+    case 'ArrowUp':
+      e.preventDefault();
+      selectedIndex = (selectedIndex - 1 + overlayItems.length) % overlayItems.length;
+      updateSelection();
+      return true;
+      
+    case 'Enter':
+      e.preventDefault();
+      if (overlayItems[selectedIndex] && overlayItems[selectedIndex].userData) {
+        return overlayItems[selectedIndex].userData;
+      }
+      return false;
+      
+    case 'Escape':
+      window.GitHubMentionsDOM.hideOverlay();
+      return true;
+      
+    default:
+      return false;
+  }
+};
+
+/**
+ * Get the currently selected item
+ * @returns {Object|null} Selected user data or null
+ */
+window.GitHubMentionsDOM.getSelectedItem = function() {
+  if (overlayItems.length > 0 && selectedIndex >= 0 && selectedIndex < overlayItems.length) {
+    return overlayItems[selectedIndex].userData;
+  }
+  return null;
 };
 
 /**
