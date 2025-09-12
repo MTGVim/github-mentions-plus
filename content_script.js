@@ -660,6 +660,32 @@ async function handleMessage(message, sender, sendResponse) {
         // Reload cached users if needed
         cachedUsers = await window.GitHubMentionsStorage.getCachedUsers();
         
+        // Force refresh any active command dropdown
+        if (activeInput) {
+          const cursor = activeInput.selectionStart;
+          const text = activeInput.value;
+          const commandInfo = scanForCommand(text, cursor);
+          
+          if (commandInfo) {
+            const commands = getAvailableCommands();
+            const matches = filterCommands(commands, commandInfo.query);
+            
+            if (matches.length > 0 && window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.showOverlay === 'function') {
+              const commandItems = matches.map(cmd => ({
+                username: cmd.command,
+                name: cmd.description || cmd.command,
+                isCommand: true,
+                emoji: cmd.emoji || null
+              }));
+              window.GitHubMentionsDOM.showOverlay(commandItems, async (cmd) => {
+                await executeCommand(cmd.username, activeInput);
+              }, activeInput);
+            } else if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
+              window.GitHubMentionsDOM.hideOverlay();
+            }
+          }
+        }
+        
         // No need to sendResponse for fire-and-forget messages
         return;
         
