@@ -1,30 +1,35 @@
 {
-  "projectName": "MTGVim/github-mentions-plus",
+  "projectName": "github-mentions-plus",
   "projectOwner": "MTGVim",
+  "repoType": "github",
+  "repoHost": "https://github.com",
   "files": [
     "README.md"
   ],
-  "commitType": "docs",
+  "imageSize": 100,
+  "commit": true,
   "commitConvention": "angular",
-  "contributorsPerLine": 7,
   "contributors": [
     {
-      "login": "MTGVim",
-      "name": "TigerYoo",
-      "avatar_url": "https://avatars.githubusercontent.com/u/6271133?v=4",
-      "profile": "https://tigeryoo-portfolio.web.app/",
+      "login": "narashin",
+      "name": "nara",
+      "avatar_url": "https://avatars.githubusercontent.com/u/16604401?v=4",
+      "profile": "https://github.com/narashin",
       "contributions": [
         "code"
       ]
     },
     {
-      "login": "narashin",
-      "name": "nara",
-      "avatar_url": "https://avatars.githubusercontent.com/u/16604401?v=4",
-      "profile": "http://nara.dev",
+      "login": "MTGVim",
+      "name": "Taekwon Yoo",
+      "avatar_url": "https://avatars.githubusercontent.com/u/6271133?v=4",
+      "profile": "https://tigeryoo-portfolio.web.app/",
       "contributions": [
-        "code"
+        "code",
+        "maintenance"
       ]
     }
-  ]
+  ],
+  "contributorsPerLine": 7,
+  "linkToUsage": true
 }
