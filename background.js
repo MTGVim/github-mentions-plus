@@ -34,7 +34,6 @@ async function fetchWithTimeout(url, options = {}) {
  */
 async function fetchRandomLGTM() {
   try {
-    
     const response = await fetchWithTimeout('https://us-central1-lgtm-reloaded.cloudfunctions.net/lgtm', {
       method: 'GET',
       headers: {
