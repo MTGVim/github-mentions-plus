@@ -180,6 +180,167 @@ function scanForTrigger(text, pos) {
 }
 
 /**
+ * Scan text for ! command trigger
+ * @param {string} text - Text to scan
+ * @param {number} pos - Cursor position
+ * @returns {Object|null} Command info {command: string, query: string} or null
+ */
+function scanForCommand(text, pos) {
+  try {
+    const slice = text.substring(0, pos);
+    const match = slice.match(/!([a-zA-Z0-9-_]*)$/);
+    return match ? { command: match[1], query: match[1] } : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Execute a command - simplified version
+ * @param {string} command - Command to execute
+ * @param {HTMLElement} input - Input element to insert result into
+ */
+async function executeCommand(command, input) {
+  try {
+    let result = '';
+    
+    // Handle built-in commands first
+    if (command === 'lgtmrand') {
+      try {
+        // Send message to background script to fetch random LGTM
+        const lgtmResult = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage(
+            { action: 'fetchRandomLGTM' },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(response);
+              }
+            }
+          );
+        });
+        
+        if (lgtmResult && lgtmResult.success && lgtmResult.imageUrl) {
+          result = `![LGTM](${lgtmResult.imageUrl})`;
+        } else {
+          result = '![LGTM](https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif)'; // fallback
+        }
+      } catch (error) {
+        result = '![LGTM](https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif)'; // fallback
+      }
+    } else {
+      // Get custom commands from settings (max 10)
+      const customCommands = settings?.customCommands || {};
+      
+      if (customCommands[command]) {
+        const commandData = customCommands[command];
+        let commandContent = '';
+        
+        if (typeof commandData === 'object') {
+          commandContent = commandData.content || '';
+        } else {
+          // Legacy format - just a string
+          commandContent = commandData;
+        }
+        
+        // Simple markdown template - just replace variables
+        result = commandContent;
+        
+        // Replace basic variables
+        result = result.replace(/\$\{timestamp\}/g, new Date().toISOString());
+        result = result.replace(/\$\{date\}/g, new Date().toLocaleDateString());
+        result = result.replace(/\$\{time\}/g, new Date().toLocaleTimeString());
+      }
+    }
+    
+    if (result) {
+      // Insert the result
+      const cursor = input.selectionStart;
+      const text = input.value;
+      const beforeCursor = text.substring(0, cursor);
+      const afterCursor = text.substring(cursor);
+      
+      // Find the start position of the command
+      const commandMatch = beforeCursor.match(/!([a-zA-Z0-9-_]*)$/);
+      if (commandMatch) {
+        const commandStart = cursor - commandMatch[0].length;
+        const newText = text.substring(0, commandStart) + result + afterCursor;
+        
+        input.value = newText;
+        input.selectionStart = input.selectionEnd = commandStart + result.length;
+        
+        // Trigger input event
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  } catch (error) {
+    console.error('[GitHub Mentions+] Command execution error:', error);
+  }
+}
+
+/**
+ * Get available commands for suggestions
+ * @returns {Array} Array of command objects
+ */
+function getAvailableCommands() {
+  // Built-in commands
+  const builtInCommands = [
+    {
+      command: 'lgtmrand',
+      description: 'Insert a random LGTM GIF from GIPHY'
+    }
+  ];
+  
+  const customCommands = settings?.customCommands || {};
+  
+  
+  const userCommands = Object.keys(customCommands).map(cmd => {
+    const commandData = customCommands[cmd];
+    let description = '';
+    let emoji = null;
+    
+    if (typeof commandData === 'object') {
+      description = (commandData.content || '').substring(0, 50) + '...';
+      emoji = commandData.emoji;
+    } else {
+      // Legacy format - just a string
+      description = commandData.substring(0, 50) + '...';
+    }
+    
+    return {
+      command: cmd,
+      description: description,
+      emoji: emoji
+    };
+  });
+  
+  // Combine built-in and user commands (max 10 total)
+  return [...builtInCommands, ...userCommands].slice(0, 10);
+}
+
+/**
+ * Filter commands based on query
+ * @param {Array} commands - Available commands
+ * @param {string} query - Search query
+ * @returns {Array} Filtered commands
+ */
+function filterCommands(commands, query) {
+  if (!Array.isArray(commands) || commands.length === 0) {
+    return [];
+  }
+  
+  if (!query) {
+    return commands.slice(0, 10); // Show all commands when no query (max 10)
+  }
+  
+  const lowerQuery = query.toLowerCase();
+  return commands.filter(cmd => 
+    cmd.command.toLowerCase().includes(lowerQuery)
+  ).slice(0, 10);
+}
+
+/**
  * Filter users based on query and exclude GitHub's current suggestions
  * @param {Array} users - User data array
  * @param {string} query - Search query
@@ -231,32 +392,48 @@ function filterUsers(users, query) {
  */
 async function onKeyUp(e) {
   if (!activeInput || !settings?.enabled) {
-    console.log('[GitHub Mentions+] Keyup ignored:', {
-      hasActiveInput: !!activeInput,
-      settingsEnabled: settings?.enabled,
-      key: e.key
-    });
     return;
   }
 
-  // Only respond to alphanumeric characters, @ symbol, and backspace/delete
+  // Check if overlay is visible and handle keyboard navigation first
+  if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.handleKeyNavigation === 'function') {
+    const handled = window.GitHubMentionsDOM.handleKeyNavigation(e);
+    if (handled === true) {
+      return; // Navigation keys were handled
+    } else if (handled && typeof handled === 'object') {
+      // Enter was pressed and returned selected item
+      const cursor = activeInput.selectionStart;
+      const text = activeInput.value;
+      const mentionQuery = scanForTrigger(text, cursor);
+      const commandInfo = scanForCommand(text, cursor);
+      
+      if (mentionQuery !== null) {
+        // Handle mention selection
+        insertMention(handled.username);
+      } else if (commandInfo && handled.isCommand) {
+        // Handle command selection
+        await executeCommand(handled.username, activeInput);
+      }
+      
+      window.GitHubMentionsDOM.hideOverlay();
+      return;
+    }
+  }
+
+  // Only respond to alphanumeric characters, @, !, and control keys
   const key = e.key;
   const isAlphanumeric = /^[a-zA-Z0-9-_]$/.test(key);
   const isAtSymbol = key === '@';
+  const isExclamationSymbol = key === '!';
   const isBackspace = key === 'Backspace';
   const isDelete = key === 'Delete';
   const isEscape = key === 'Escape';
+  const isEnter = key === 'Enter';
   
   // Ignore navigation keys, arrows, etc.
-  if (!isAlphanumeric && !isAtSymbol && !isBackspace && !isDelete && !isEscape) {
+  if (!isAlphanumeric && !isAtSymbol && !isExclamationSymbol && !isBackspace && !isDelete && !isEscape && !isEnter) {
     return;
   }
-
-  console.log('[GitHub Mentions+] Keyup event:', {
-    key: key,
-    isAlphanumeric: isAlphanumeric,
-    isAtSymbol: isAtSymbol
-  });
 
   // If Escape was pressed, just hide overlay and don't process further
   if (isEscape) {
@@ -269,32 +446,55 @@ async function onKeyUp(e) {
   try {
     const cursor = activeInput.selectionStart;
     const text = activeInput.value;
-    const query = scanForTrigger(text, cursor);
     
-    console.log('[GitHub Mentions+] Scan result:', {
-      activeInput,
-      cursor: cursor,
-      text: text.substring(Math.max(0, cursor - 10), cursor),
-      query: query
-    });
+    // Check for @ mentions first
+    const mentionQuery = scanForTrigger(text, cursor);
+    // Check for / commands
+    const commandInfo = scanForCommand(text, cursor);
+    
+
+    // Handle Enter key for command execution
+    if (isEnter && commandInfo) {
+      await executeCommand(commandInfo.command, activeInput);
+      if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
+        window.GitHubMentionsDOM.hideOverlay();
+      }
+      return;
+    }
   
-    if (query !== null) {
-      mentionStartPos = cursor - query.length - 1; // position of the @
+    // Handle @ mentions
+    if (mentionQuery !== null) {
+      mentionStartPos = cursor - mentionQuery.length - 1; // position of the @
     
       const users = await getUsersForSuggestions();
-      const matches = filterUsers(users, query);
-      
-      console.log('[GitHub Mentions+] User suggestions:', {
-        totalUsers: users.length,
-        matches: matches.length,
-        matches: matches.map(u => u.username)
-      });
+      const matches = filterUsers(users, mentionQuery);
   
       if (matches.length > 0) {
         // Check if DOM utilities are available
         if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.showOverlay === 'function') {
-          console.log('[GitHub Mentions+] Showing overlay with', matches.length, 'users');
           window.GitHubMentionsDOM.showOverlay(matches, (user) => insertMention(user.username), activeInput);
+        }
+        return;
+      }
+    }
+    
+    // Handle ! commands
+    if (commandInfo) {
+      const commands = getAvailableCommands();
+      const matches = filterCommands(commands, commandInfo.query);
+      
+      if (matches.length > 0) {
+        if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.showOverlay === 'function') {
+          // Transform commands to look like users for the overlay
+          const commandItems = matches.map(cmd => ({
+            username: cmd.command,
+            name: cmd.description || cmd.command,
+            isCommand: true,
+            emoji: cmd.emoji || null
+          }));
+          window.GitHubMentionsDOM.showOverlay(commandItems, async (cmd) => {
+            await executeCommand(cmd.username, activeInput);
+          }, activeInput);
         }
         return;
       }
@@ -320,13 +520,14 @@ async function onKeyUp(e) {
 function onInput(e) {
   if (!activeInput || !settings?.enabled) return;
 
-  // Check if we're still in a valid @mention context
+  // Check contexts
   const cursor = activeInput.selectionStart;
   const text = activeInput.value;
-  const query = scanForTrigger(text, cursor);
+  const mentionQuery = scanForTrigger(text, cursor);
+  const commandInfo = scanForCommand(text, cursor);
 
-  // If we're not in a valid @mention context anymore, hide the overlay
-  if (query === null) {
+  // If we're not in any valid context anymore, hide the overlay
+  if (mentionQuery === null && !commandInfo) {
     if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
       window.GitHubMentionsDOM.hideOverlay();
     }
@@ -451,7 +652,43 @@ async function handleMessage(message, sender, sendResponse) {
       return;
     }
     
-    switch (message.action) {
+    switch (message.action || message.type) {
+      case 'SETTINGS_UPDATED':
+        // Handle settings update from popup
+        settings = message.settings;
+        
+        // Reload cached users if needed
+        cachedUsers = await window.GitHubMentionsStorage.getCachedUsers();
+        
+        // Force refresh any active command dropdown
+        if (activeInput) {
+          const cursor = activeInput.selectionStart;
+          const text = activeInput.value;
+          const commandInfo = scanForCommand(text, cursor);
+          
+          if (commandInfo) {
+            const commands = getAvailableCommands();
+            const matches = filterCommands(commands, commandInfo.query);
+            
+            if (matches.length > 0 && window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.showOverlay === 'function') {
+              const commandItems = matches.map(cmd => ({
+                username: cmd.command,
+                name: cmd.description || cmd.command,
+                isCommand: true,
+                emoji: cmd.emoji || null
+              }));
+              window.GitHubMentionsDOM.showOverlay(commandItems, async (cmd) => {
+                await executeCommand(cmd.username, activeInput);
+              }, activeInput);
+            } else if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
+              window.GitHubMentionsDOM.hideOverlay();
+            }
+          }
+        }
+        
+        // No need to sendResponse for fire-and-forget messages
+        return;
+        
       case 'testEndpoint':
         const testResult = await window.GitHubMentionsAPI.testEndpoint(message.endpointUrl);
         sendResponse(testResult);
@@ -559,9 +796,55 @@ function handleClickOutside(e) {
  * @param {KeyboardEvent} e - Keydown event
  */
 function handleEscapeKey(e) {
+  // First check if overlay handles the key
+  if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.handleKeyNavigation === 'function') {
+    const handled = window.GitHubMentionsDOM.handleKeyNavigation(e);
+    if (handled === true) {
+      return; // Key was handled by overlay
+    } else if (handled && typeof handled === 'object') {
+      // Enter was pressed and returned selected item
+      if (activeInput && settings?.enabled) {
+        const cursor = activeInput.selectionStart;
+        const text = activeInput.value;
+        const mentionQuery = scanForTrigger(text, cursor);
+        const commandInfo = scanForCommand(text, cursor);
+        
+        if (mentionQuery !== null) {
+          // Handle mention selection
+          insertMention(handled.username);
+        } else if (commandInfo && handled.isCommand) {
+          // Handle command selection
+          setTimeout(async () => {
+            await executeCommand(handled.username, activeInput);
+            if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
+              window.GitHubMentionsDOM.hideOverlay();
+            }
+          }, 0);
+        }
+      }
+      return;
+    }
+  }
+  
+  // Fallback for when overlay is not visible
   if (e.key === 'Escape') {
     if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
       window.GitHubMentionsDOM.hideOverlay();
+    }
+  } else if (e.key === 'Enter' && activeInput && settings?.enabled) {
+    const cursor = activeInput.selectionStart;
+    const text = activeInput.value;
+    const commandInfo = scanForCommand(text, cursor);
+    
+    if (commandInfo) {
+      e.preventDefault();
+      
+      setTimeout(async () => {
+        await executeCommand(commandInfo.command, activeInput);
+        if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
+          window.GitHubMentionsDOM.hideOverlay();
+        }
+      }, 0);
     }
   }
 }

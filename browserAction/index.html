@@ -100,6 +100,49 @@
         </section>
 
         <section class="settings-section">
+          <h2>! Commands (Max 10)</h2>
+          
+          <div class="form-group">
+            <p class="subtitle">Create custom commands that insert markdown snippets into GitHub comments.</p>
+          </div>
+          
+          <div id="commandsGrid" class="commands-grid">
+            <!-- Command cards will be added here -->
+          </div>
+          
+          <div class="form-group" style="text-align: center; margin-top: 20px;">
+            <button id="addCommand" class="btn btn-primary">
+              + Add New Command
+            </button>
+            <span id="commandCount" class="command-count">0/10</span>
+          </div>
+          
+          <details class="help-details">
+            <summary>How to use commands</summary>
+            <div class="help-content">
+              <p><strong>Usage:</strong> Type <code>!commandname</code> in any GitHub comment box and press Enter</p>
+              
+              <p><strong>Examples:</strong></p>
+              <pre><code>!lgtm → ![LGTM](https://media.giphy.com/media/XreQmk7ETCak0/giphy.gif)
+
+!checklist → 
+- [ ] Review completed
+- [ ] Tests passing  
+- [ ] Ready to merge
+
+!approved → ✅ **Approved!** Ready for merge.</code></pre>
+              
+              <p><strong>Variables you can use:</strong></p>
+              <ul>
+                <li><code>${timestamp}</code> - Current ISO timestamp</li>
+                <li><code>${date}</code> - Current date</li>  
+                <li><code>${time}</code> - Current time</li>
+              </ul>
+            </div>
+          </details>
+        </section>
+
+        <section class="settings-section">
           <h2>Extension Status</h2>
           
           <div class="status-grid">
@@ -131,6 +174,55 @@
           Save Settings
         </button>
       </footer>
+    </div>
+
+    <!-- Command Editor Modal -->
+    <div id="commandModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">Add Command</h3>
+          <button id="modalClose" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="commandName">Command Name</label>
+            <input type="text" id="commandName" class="form-control command-name-input" placeholder="lgtm">
+            <small class="help-text">Use only letters, numbers, hyphens, and underscores</small>
+          </div>
+          <div class="form-group">
+            <label for="commandEmoji">Command Icon (Optional)</label>
+            <div class="emoji-selector">
+              <input type="text" id="commandEmoji" class="form-control emoji-input" placeholder="Click to select emoji or leave empty" readonly>
+              <button type="button" id="emojiPickerBtn" class="btn btn-secondary emoji-picker-btn">📝</button>
+            </div>
+            <div id="emojiPicker" class="emoji-picker hidden">
+              <div class="emoji-categories">
+                <button type="button" class="emoji-category active" data-category="recent">⏰</button>
+                <button type="button" class="emoji-category" data-category="smileys">😀</button>
+                <button type="button" class="emoji-category" data-category="objects">📝</button>
+                <button type="button" class="emoji-category" data-category="symbols">⚡</button>
+              </div>
+              <div class="emoji-grid" id="emojiGrid">
+                <!-- Emojis will be populated here -->
+              </div>
+              <button type="button" id="clearEmoji" class="btn btn-secondary btn-mini">Clear</button>
+            </div>
+            <small class="help-text">Choose an emoji to represent your command in the dropdown</small>
+          </div>
+          <div class="form-group">
+            <label for="commandContent">Command Content</label>
+            <textarea id="commandContent" class="form-control command-content" rows="8" placeholder="🚀 Ready for review!
+
+Updated: ${timestamp}
+
+Available variables: ${timestamp}, ${date}, ${time}"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="modalCancel" class="btn btn-secondary">Cancel</button>
+          <button id="modalSave" class="btn btn-primary">Save</button>
+        </div>
+      </div>
     </div>
 
     <script src="../utils/storage.js"></script>

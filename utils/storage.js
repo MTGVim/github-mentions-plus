@@ -25,6 +25,7 @@ window.GitHubMentionsStorage = {};
  * @property {string} endpointUrl - Custom endpoint URL (when dataSource is "endpoint")
  * @property {string} directJsonData - Direct JSON data (when dataSource is "direct")
  * @property {boolean} enabled - Whether extension is enabled
+ * @property {Object<string, string>} customCommands - Custom command scripts
  */
 
 const STORAGE_KEYS = {
@@ -163,14 +164,16 @@ window.GitHubMentionsStorage.getSettings = async function() {
       dataSource: 'endpoint',
       endpointUrl: '',
       directJsonData: '',
-      enabled: true
+      enabled: true,
+      customCommands: {}
     };
   } catch (error) {
     return {
       dataSource: 'endpoint',
       endpointUrl: '',
       directJsonData: '',
-      enabled: true
+      enabled: true,
+      customCommands: {}
     };
   }
 };
@@ -187,7 +190,8 @@ window.GitHubMentionsStorage.setSettings = async function(settings) {
         dataSource: settings.dataSource || 'endpoint',
         endpointUrl: settings.endpointUrl || '',
         directJsonData: settings.directJsonData || '',
-        enabled: settings.enabled !== false
+        enabled: settings.enabled !== false,
+        customCommands: settings.customCommands || {}
       }
     });
     return true;

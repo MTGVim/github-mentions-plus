@@ -19,6 +19,34 @@ const extensionStatus = document.getElementById('extensionStatus');
 const dataSourceStatus = document.getElementById('dataSourceStatus');
 const cachedUsersCount = document.getElementById('cachedUsersCount');
 const cacheStatus = document.getElementById('cacheStatus');
+const commandsGrid = document.getElementById('commandsGrid');
+const addCommandBtn = document.getElementById('addCommand');
+const commandCountDisplay = document.getElementById('commandCount');
+
+// Modal elements
+const commandModal = document.getElementById('commandModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalClose = document.getElementById('modalClose');
+const modalCancel = document.getElementById('modalCancel');
+const modalSave = document.getElementById('modalSave');
+const commandNameInput = document.getElementById('commandName');
+const commandContentTextarea = document.getElementById('commandContent');
+const commandEmojiInput = document.getElementById('commandEmoji');
+const emojiPickerBtn = document.getElementById('emojiPickerBtn');
+const emojiPicker = document.getElementById('emojiPicker');
+const emojiGrid = document.getElementById('emojiGrid');
+const clearEmojiBtn = document.getElementById('clearEmoji');
+
+// Modal state
+let editingCommand = null;
+
+// Emoji data
+const emojiData = {
+  recent: ['⏰', '📝', '⚡', '🚀', '✅', '❌', '🔥', '💡'],
+  smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏'],
+  objects: ['📝', '📋', '📊', '📈', '📉', '🗂', '📅', '📆', '🗓', '📇', '🗃', '🗄', '📑', '📒', '📓', '📔', '📕', '📖', '📗', '📘', '📙', '📚', '📛', '🔖', '🏷', '📄', '📃', '📋', '📊'],
+  symbols: ['⚡', '🔥', '💡', '⭐', '🌟', '✨', '💫', '⚠️', '🚨', '🔔', '🔕', '📢', '📣', '💬', '💭', '🗯', '♨️', '💥', '💢', '💦', '💨', '🕳', '💣', '💤', '👁', '🗨', '🗯', '💭', '🔮', '💈', '⚗️', '🔬']
+};
 
 // State
 let currentSettings = null;
@@ -39,6 +67,9 @@ async function initialize() {
     
     // Show appropriate section based on current data source
     updateDataSourceSection();
+    
+    // Load and display commands
+    updateCommandsGrid();
     
   } catch (error) {
     // Silently handle initialization errors
@@ -109,7 +140,8 @@ async function saveSettings() {
       dataSource: selectedDataSource,
       endpointUrl: selectedDataSource === 'endpoint' ? endpointUrlInput.value.trim() : '',
       directJsonData: selectedDataSource === 'direct' ? directJsonData.value.trim() : '',
-      enabled: true
+      enabled: true,
+      customCommands: currentSettings?.customCommands || {}
     };
     
     // Use storage utilities directly
@@ -465,6 +497,66 @@ function setupEventListeners() {
   // Load direct users button
   loadDirectUsersBtn.addEventListener('click', loadDirectUsers);
   
+  // Add command button
+  if (addCommandBtn) {
+    addCommandBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      createNewCommand();
+    });
+  }
+  
+  // Modal event listeners
+  if (modalClose) modalClose.addEventListener('click', closeCommandModal);
+  if (modalCancel) modalCancel.addEventListener('click', closeCommandModal);
+  if (modalSave) modalSave.addEventListener('click', saveCommand);
+  
+  // Command name validation on input
+  if (commandNameInput) {
+    commandNameInput.addEventListener('input', validateCommandNameInput);
+    commandNameInput.addEventListener('blur', validateCommandNameInput);
+  }
+  
+  // Emoji picker event listeners
+  if (emojiPickerBtn) {
+    emojiPickerBtn.addEventListener('click', toggleEmojiPicker);
+  }
+  
+  if (commandEmojiInput) {
+    commandEmojiInput.addEventListener('click', toggleEmojiPicker);
+  }
+  
+  if (clearEmojiBtn) {
+    clearEmojiBtn.addEventListener('click', clearEmoji);
+  }
+  
+  // Emoji category buttons
+  document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('emoji-category')) {
+      switchEmojiCategory(e.target.dataset.category);
+    } else if (e.target.classList.contains('emoji-item')) {
+      selectEmoji(e.target.textContent);
+    } else if (!emojiPicker.contains(e.target) && !emojiPickerBtn.contains(e.target) && !commandEmojiInput.contains(e.target)) {
+      // Click outside emoji picker - close it
+      hideEmojiPicker();
+    }
+  });
+  
+  // Close modal when clicking outside
+  if (commandModal) {
+    commandModal.addEventListener('click', (e) => {
+      if (e.target === commandModal) {
+        closeCommandModal();
+      }
+    });
+  }
+  
+  // Close modal with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !commandModal.classList.contains('hidden')) {
+      closeCommandModal();
+    }
+  });
+  
   // Enter key on inputs
   endpointUrlInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
@@ -477,6 +569,432 @@ function setupEventListeners() {
       loadDirectUsers();
     }
   });
+}
+
+/**
+ * Update commands grid display
+ */
+function updateCommandsGrid() {
+  const customCommands = currentSettings?.customCommands || {};
+  
+  commandsGrid.innerHTML = '';
+  
+  // Add built-in commands section
+  const builtInSection = document.createElement('div');
+  builtInSection.className = 'built-in-commands-section';
+  builtInSection.innerHTML = `
+    <h4 class="commands-section-title">Built-in Commands</h4>
+    <div class="built-in-commands-grid"></div>
+  `;
+  commandsGrid.appendChild(builtInSection);
+  
+  const builtInGrid = builtInSection.querySelector('.built-in-commands-grid');
+  
+  // Add lgtmrand built-in command card
+  createBuiltInCommandCard('lgtmrand', 'Insert a random LGTM GIF from GIPHY', builtInGrid);
+  
+  // Add custom commands section if there are any
+  if (Object.keys(customCommands).length > 0) {
+    const customSection = document.createElement('div');
+    customSection.className = 'custom-commands-section';
+    customSection.innerHTML = `
+      <h4 class="commands-section-title">Custom Commands</h4>
+      <div class="custom-commands-grid"></div>
+    `;
+    commandsGrid.appendChild(customSection);
+    
+    const customGrid = customSection.querySelector('.custom-commands-grid');
+    
+    // Add existing custom commands as cards
+    Object.entries(customCommands).forEach(([name, content], index) => {
+      createCommandCard(name, content, index + 1, customGrid);
+    });
+  } else {
+    // Show empty state for custom commands
+    const customSection = document.createElement('div');
+    customSection.className = 'custom-commands-section';
+    customSection.innerHTML = `
+      <h4 class="commands-section-title">Custom Commands</h4>
+      <div class="empty-state">
+        <p>No custom commands yet. Click "Add New Command" to create your first one!</p>
+      </div>
+    `;
+    commandsGrid.appendChild(customSection);
+  }
+  
+  // Update counter
+  updateCommandCounter();
+}
+
+/**
+ * Create a built-in command card
+ */
+function createBuiltInCommandCard(name, description, container) {
+  const card = document.createElement('div');
+  card.className = 'command-card built-in-card';
+  card.dataset.commandName = name;
+  
+  card.innerHTML = `
+    <div class="built-in-badge">Built-in</div>
+    <div class="command-name">!${name}</div>
+    <div class="command-preview">${description}</div>
+    <div class="command-actions">
+      <span class="built-in-info">Cannot be edited or deleted</span>
+    </div>
+  `;
+  
+  container.appendChild(card);
+}
+
+/**
+ * Create a command card
+ */
+function createCommandCard(name, content, number, container = null) {
+  const card = document.createElement('div');
+  card.className = 'command-card';
+  card.dataset.commandName = name;
+  
+  const preview = content.length > 100 ? content.substring(0, 100) + '...' : content;
+  
+  // Get emoji from command data
+  const customCommands = currentSettings?.customCommands || {};
+  const commandData = customCommands[name];
+  const emoji = (typeof commandData === 'object' && commandData.emoji) ? commandData.emoji : '';
+  
+  card.innerHTML = `
+    <div class="command-number">${number}</div>
+    <div class="command-header">
+      ${emoji ? `<span class="command-emoji">${emoji}</span>` : ''}
+      <div class="command-name">!${name}</div>
+    </div>
+    <div class="command-preview">${typeof commandData === 'object' ? commandData.content : content}</div>
+    <div class="command-actions">
+      <button class="btn btn-secondary btn-mini edit-command">Edit</button>
+      <button class="btn btn-danger btn-mini delete-command">Delete</button>
+    </div>
+  `;
+  
+  // Add event listeners
+  card.querySelector('.edit-command').addEventListener('click', () => editCommand(name));
+  card.querySelector('.delete-command').addEventListener('click', () => deleteCommand(name));
+  
+  if (container) {
+    container.appendChild(card);
+  } else {
+    commandsGrid.appendChild(card);
+  }
+}
+
+/**
+ * Create new command dialog
+ */
+function createNewCommand() {
+  console.log('[GitHub Mentions+] createNewCommand called');
+  
+  // Ensure currentSettings exists
+  if (!currentSettings) {
+    currentSettings = {
+      dataSource: 'endpoint',
+      endpointUrl: '',
+      directJsonData: '',
+      enabled: true,
+      customCommands: {}
+    };
+  }
+  
+  const commandCount = Object.keys(currentSettings?.customCommands || {}).length;
+  if (commandCount >= 10) {
+    showError('Maximum 10 commands allowed');
+    return;
+  }
+  
+  openCommandModal(null, '🚀 Ready for review!\n\nUpdated: ${timestamp}');
+}
+
+/**
+ * Edit command dialog  
+ */
+function editCommand(name) {
+  const customCommands = currentSettings?.customCommands || {};
+  const commandData = customCommands[name];
+  
+  let content = '';
+  let emoji = '';
+  
+  if (typeof commandData === 'object') {
+    content = commandData.content || '';
+    emoji = commandData.emoji || '';
+  } else {
+    // Legacy format - just a string
+    content = commandData || '';
+  }
+  
+  openCommandModal(name, content, emoji);
+}
+
+/**
+ * Open command modal
+ */
+function openCommandModal(commandName = null, content = '', emoji = '') {
+  editingCommand = commandName;
+  
+  if (commandName) {
+    modalTitle.textContent = `Edit Command: !${commandName}`;
+    commandNameInput.value = commandName;
+    commandNameInput.disabled = true; // Don't allow renaming
+  } else {
+    modalTitle.textContent = 'Add New Command';
+    commandNameInput.value = '';
+    commandNameInput.disabled = false;
+  }
+  
+  commandContentTextarea.value = content;
+  commandEmojiInput.value = emoji;
+  commandModal.classList.remove('hidden');
+  
+  // Hide emoji picker if it's open
+  hideEmojiPicker();
+  
+  // Focus first input
+  if (commandName) {
+    commandContentTextarea.focus();
+  } else {
+    commandNameInput.focus();
+  }
+}
+
+/**
+ * Close command modal
+ */
+function closeCommandModal() {
+  commandModal.classList.add('hidden');
+  editingCommand = null;
+  commandNameInput.value = '';
+  commandContentTextarea.value = '';
+  commandEmojiInput.value = '';
+  
+  // Hide emoji picker
+  hideEmojiPicker();
+  
+  // Clear validation state
+  commandNameInput.classList.remove('invalid');
+  const validationMessage = document.getElementById('commandNameValidation');
+  if (validationMessage) {
+    validationMessage.textContent = '';
+    validationMessage.className = 'validation-message';
+  }
+}
+
+/**
+ * Validate command name input in real-time
+ */
+function validateCommandNameInput() {
+  const name = commandNameInput.value.trim();
+  const validationMessage = document.getElementById('commandNameValidation') || createValidationMessage();
+  
+  // Clear previous validation state
+  commandNameInput.classList.remove('invalid');
+  validationMessage.textContent = '';
+  validationMessage.className = 'validation-message';
+  
+  if (!name) {
+    // Empty is neutral, not invalid
+    return true;
+  }
+  
+  // Check if name contains only allowed characters (letters, numbers, hyphens, underscores)
+  const validPattern = /^[a-zA-Z0-9-_]+$/;
+  
+  if (!validPattern.test(name)) {
+    commandNameInput.classList.add('invalid');
+    validationMessage.textContent = 'Only letters, numbers, hyphens, and underscores are allowed';
+    validationMessage.classList.add('error');
+    return false;
+  }
+  
+  // Check for duplicate (only if creating new)
+  const customCommands = currentSettings?.customCommands || {};
+  if (!editingCommand && customCommands[name]) {
+    commandNameInput.classList.add('invalid');
+    validationMessage.textContent = 'Command name already exists';
+    validationMessage.classList.add('error');
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Create validation message element
+ */
+function createValidationMessage() {
+  const validationMessage = document.createElement('div');
+  validationMessage.id = 'commandNameValidation';
+  validationMessage.className = 'validation-message';
+  
+  // Insert after the command name input
+  commandNameInput.parentNode.appendChild(validationMessage);
+  
+  return validationMessage;
+}
+
+/**
+ * Save command from modal
+ */
+async function saveCommand() {
+  const name = commandNameInput.value.trim();
+  const content = commandContentTextarea.value.trim();
+  const emoji = commandEmojiInput.value.trim();
+  
+  if (!name) {
+    showError('Command name is required');
+    commandNameInput.focus();
+    return;
+  }
+  
+  if (!content) {
+    showError('Command content is required');
+    commandContentTextarea.focus();
+    return;
+  }
+  
+  // Use the validation function to check if name is valid
+  if (!validateCommandNameInput()) {
+    commandNameInput.focus();
+    return;
+  }
+  
+  // Update settings
+  if (!currentSettings.customCommands) {
+    currentSettings.customCommands = {};
+  }
+  
+  // Store command as object with content and emoji
+  currentSettings.customCommands[name] = {
+    content: content,
+    emoji: emoji || null
+  };
+  
+  
+  // Close modal and refresh UI
+  closeCommandModal();
+  await saveSettingsAndRefresh();
+}
+
+/**
+ * Delete command
+ */
+async function deleteCommand(name) {
+  if (!confirm(`Delete command !${name}?`)) return;
+  
+  if (currentSettings?.customCommands) {
+    delete currentSettings.customCommands[name];
+    await saveSettingsAndRefresh();
+  }
+}
+
+/**
+ * Update command counter
+ */
+function updateCommandCounter() {
+  const commandCount = Object.keys(currentSettings?.customCommands || {}).length;
+  commandCountDisplay.textContent = `${commandCount}/10`;
+  
+  // Disable add button if at limit
+  if (commandCount >= 10) {
+    addCommandBtn.disabled = true;
+    addCommandBtn.textContent = 'Maximum Reached';
+  } else {
+    addCommandBtn.disabled = false;
+    addCommandBtn.textContent = '+ Add New Command';
+  }
+}
+
+/**
+ * Toggle emoji picker visibility
+ */
+function toggleEmojiPicker() {
+  if (emojiPicker.classList.contains('hidden')) {
+    showEmojiPicker();
+  } else {
+    hideEmojiPicker();
+  }
+}
+
+/**
+ * Show emoji picker
+ */
+function showEmojiPicker() {
+  emojiPicker.classList.remove('hidden');
+  // Initialize with recent emojis
+  switchEmojiCategory('recent');
+}
+
+/**
+ * Hide emoji picker
+ */
+function hideEmojiPicker() {
+  emojiPicker.classList.add('hidden');
+}
+
+/**
+ * Switch emoji category
+ */
+function switchEmojiCategory(category) {
+  // Update active category button
+  document.querySelectorAll('.emoji-category').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.querySelector(`[data-category="${category}"]`).classList.add('active');
+  
+  // Update emoji grid
+  const emojis = emojiData[category] || [];
+  emojiGrid.innerHTML = '';
+  
+  emojis.forEach(emoji => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'emoji-item';
+    button.textContent = emoji;
+    emojiGrid.appendChild(button);
+  });
+}
+
+/**
+ * Select emoji
+ */
+function selectEmoji(emoji) {
+  commandEmojiInput.value = emoji;
+  hideEmojiPicker();
+}
+
+/**
+ * Clear selected emoji
+ */
+function clearEmoji() {
+  commandEmojiInput.value = '';
+  hideEmojiPicker();
+}
+
+/**
+ * Save settings and refresh UI
+ */
+async function saveSettingsAndRefresh() {
+  await saveSettings();
+  updateCommandsGrid();
+  
+  // Notify all GitHub tabs about the settings change
+  try {
+    const tabs = await chrome.tabs.query({url: '*://*.github.com/*'});
+    for (const tab of tabs) {
+      chrome.tabs.sendMessage(tab.id, {
+        type: 'SETTINGS_UPDATED',
+        settings: currentSettings
+      });
+    }
+  } catch (error) {
+    // Silently handle notification errors
+  }
 }
 
 // Initialize when DOM is ready
