@@ -112,7 +112,7 @@ Enter your user data directly in the extension settings:
 <table>
   <tbody>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/narashin"><img src="https://avatars.githubusercontent.com/u/16604401?v=4?s=100" width="100px;" alt="nara"/><br /><sub><b>nara</b></sub></a><br /><a href="https://github.com/MTGVim/github-mentions-plus/commits?author=narashin" title="Code">💻</a> <a href="#maintenance-narashin" title="Maintenance">🚧</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/narashin"><img src="https://avatars.githubusercontent.com/u/16604401?v=4?s=100" width="100px;" alt="nara"/><br /><sub><b>nara</b></sub></a><br /><a href="https://github.com/MTGVim/github-mentions-plus/commits?author=narashin" title="Code">💻</a></td>
     </tr>
   </tbody>
   <tfoot>
