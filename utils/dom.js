@@ -6,16 +6,6 @@
 // Make utilities available globally
 window.GitHubMentionsDOM = {};
 
-/** <ul role="listbox" class="suggester-container suggester suggestions list-style-none position-absolute" id="text-expander-81574" style="left: calc(29.6953px); top: calc(3.5px);">      
-<li role="option" id="suggester-16604401-user-narashin" data-value="narashin" aria-selected="true">
-  <span>narashin</span>
-      <small>nara</small>
-  </li>    
-</ul> */
-const getGithubOverlay = () => {
-  return document.querySelector('.suggester-container');
-}
-
 /**
  * @typedef {Object} UserData
  * @property {string} username - GitHub username
@@ -94,9 +84,9 @@ window.GitHubMentionsDOM.updateOverlayPosition = function(activeInput) {
 
   const rect = activeInput.getBoundingClientRect();
   overlay.style.left = `${rect.left}px`;
-  overlay.style.top = `${rect.bottom + 6 + activeInput.scrollTop}px`; // account for scroll
-  overlay.style.width = `${rect.width}px`; // auto width for fallback
-  overlay.style.borderRadius = '0.75rem'; // full rounded corners for fallback
+  overlay.style.top = `${rect.bottom + 6 + activeInput.scrollTop}px`;
+  overlay.style.width = `${rect.width}px`;
+  overlay.style.borderRadius = '0.75rem';
   overlay.style.position = 'fixed';
   overlay.style.margin = "0";
   overlay.setAttribute("popover", "manual");
@@ -317,12 +307,6 @@ window.GitHubMentionsDOM.hideOverlay = function() {
     overlay.style.display = 'none';
     selectedIndex = 0;
     overlayItems = [];
-    
-    // Restore GitHub's overlay border radius to fully rounded when our overlay is hidden
-    const githubOverlay = document.querySelector('[class*="AutocompleteSuggestions-module__Overlay"]');
-    if (githubOverlay) {
-      githubOverlay.style.borderRadius = '0.75rem';
-    }
   }
 };
 
@@ -402,53 +386,3 @@ window.GitHubMentionsDOM.getSelectedItem = function() {
   }
   return null;
 };
-
-/**
- * Get usernames from GitHub's current suggestions to avoid duplicates
- * @returns {Array<string>} Array of usernames currently shown by GitHub
- */
-window.GitHubMentionsDOM.getGitHubSuggestions = function() {
-  try {
-    const githubOverlay = getGithubOverlay();
-    if (!githubOverlay || githubOverlay.style.display === 'none') {
-      return [];
-    }
-
-    // Look for suggestion items in GitHub's overlay
-    const suggestionItems = githubOverlay.querySelectorAll('[role="option"]');
-    
-    const usernames = [];
-    suggestionItems.forEach(item => {
-      // Try to extract username from various possible text patterns
-      const text = item.textContent || '';
-      
-      // Look for @username pattern
-      const atMatch = text.match(/@([a-zA-Z0-9-_]+)/);
-      if (atMatch) {
-        usernames.push(atMatch[1]);
-        return;
-      }
-      
-      // Look for username without @ (might be in a different element)
-      const usernameMatch = text.match(/([a-zA-Z0-9-_]+)/);
-      if (usernameMatch) {
-        usernames.push(usernameMatch[1]);
-        return;
-      }
-      
-      // Try to find username in child elements
-      const usernameElement = item.querySelector('[class*="username"], [class*="login"], strong, b');
-      if (usernameElement) {
-        const usernameText = usernameElement.textContent || '';
-        const cleanUsername = usernameText.replace(/@/, '').trim();
-        if (cleanUsername) {
-          usernames.push(cleanUsername);
-        }
-      }
-    });
-    
-    return usernames;
-  } catch (error) {
-    return [];
-  }
-}; 

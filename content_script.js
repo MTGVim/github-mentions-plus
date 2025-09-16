@@ -353,9 +353,6 @@ function filterUsers(users, query) {
 
   // Get GitHub's current suggestions to avoid duplicates
   let githubUsernames = [];
-  if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.getGitHubSuggestions === 'function') {
-    githubUsernames = window.GitHubMentionsDOM.getGitHubSuggestions();
-  }
 
   // Filter out users that GitHub is already suggesting
   const filteredUsers = users.filter(user => 
