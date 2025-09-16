@@ -15,9 +15,9 @@ GitHub's native @mention autocomplete only suggests users that the current user 
 
 ## Solution
 
-GitHub Mentions+ augments GitHub's native @mention autocomplete by:
+GitHub Mentions+ augments GitHub's native @@mention autocomplete by:
 
-1. **Listening** for @ mentions in GitHub textareas and contenteditable elements
+1. **Listening** for @@ mentions in GitHub textareas and contenteditable elements
 2. **Fetching** custom user suggestions from a user-configurable endpoint OR direct JSON input
 3. **Displaying** suggestions in a native-looking overlay that complements GitHub's existing UI
 4. **Caching** results to minimize API calls and improve performance
@@ -31,7 +31,7 @@ GitHub Mentions+ augments GitHub's native @mention autocomplete by:
 3. Enable "Developer mode"
 4. Click "Load unpacked" and select the extension directory
 5. Click the extension icon to configure your data source
-6. Start using @mentions on GitHub!
+6. Start using @@mentions on GitHub!
 7. The extension will be installed and active on GitHub pages
 
 ### For Users
@@ -39,7 +39,7 @@ GitHub Mentions+ augments GitHub's native @mention autocomplete by:
 1. Download the extension from the browser store (coming soon)
 2. Install the extension
 3. Click the extension icon to configure your data source
-4. Start using @mentions on GitHub!
+4. Start using @@mentions on GitHub!
 
 ## Configuration
 
