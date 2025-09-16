@@ -6,6 +6,16 @@
 // Make utilities available globally
 window.GitHubMentionsDOM = {};
 
+/** <ul role="listbox" class="suggester-container suggester suggestions list-style-none position-absolute" id="text-expander-81574" style="left: calc(29.6953px); top: calc(3.5px);">      
+<li role="option" id="suggester-16604401-user-narashin" data-value="narashin" aria-selected="true">
+  <span>narashin</span>
+      <small>nara</small>
+  </li>    
+</ul> */
+const getGithubOverlay = () => {
+  return document.querySelector('.suggester-container');
+}
+
 /**
  * @typedef {Object} UserData
  * @property {string} username - GitHub username
@@ -78,56 +88,21 @@ window.GitHubMentionsDOM.createOverlay = function() {
  * @param {HTMLElement} activeInput - The active input element
  */
 window.GitHubMentionsDOM.updateOverlayPosition = function(activeInput) {
-  if (!overlay) {
+  if (!overlay || !activeInput) {
     return;
   }
 
-  const githubOverlay = document.querySelector('[class*="AutocompleteSuggestions-module__Overlay"]');
-  if (githubOverlay) {
-    // Reset both overlays to auto width to measure natural content width
-    overlay.style.width = 'auto';
-    githubOverlay.style.width = 'auto';
-    
-    // Force a reflow to ensure the auto width is applied before measuring
-    overlay.offsetHeight;
-    githubOverlay.offsetHeight;
-    
-    const rect = githubOverlay.getBoundingClientRect();
-    const ourRect = overlay.getBoundingClientRect();
-    
-    // Calculate the optimal width - use the larger of the two overlays
-    const optimalWidth = Math.max(rect.width, ourRect.width);
-    
-    overlay.style.left = `${rect.left - 1}px`;
-    overlay.style.top = `${rect.bottom + window.scrollY}px`; // show below GitHub's while it's visible, account for scroll
-    overlay.style.width = `${optimalWidth}px`; // use the larger width
-    overlay.style.maxWidth = 'none'; // clear any max-width constraint
-    
-    // Adjust border radius to make overlays look connected
-    overlay.style.borderRadius = '0 0 0.75rem 0.75rem'; // no top corners when below GitHub
-    githubOverlay.style.borderRadius = '0.75rem 0.75rem 0 0'; // no bottom corners when above ours
-    
-    // Also set GitHub's overlay to the same width for consistency
-    githubOverlay.style.width = `${optimalWidth}px`;
-    
-    lastGoodPosition = {
-      left: rect.left,
-      top: rect.top + window.scrollY, // cache the top for future use, account for scroll
-      width: optimalWidth, // cache the optimal width for future use
-    };
-  } else if (lastGoodPosition) {
-    overlay.style.left = `${lastGoodPosition.left}px`;
-    overlay.style.top = `${lastGoodPosition.top}px`; // use top instead of bottom when GitHub is gone
-    overlay.style.width = 'auto'; // use auto width when GitHub is not visible
-    overlay.style.borderRadius = '0.75rem'; // restore full rounded corners when alone
-  } else if (activeInput) {
-    // fallback (only used if no GitHub overlay has ever been shown)
-    const rect = activeInput.getBoundingClientRect();
-    overlay.style.left = `${rect.left + 10}px`;
-    overlay.style.top = `${rect.bottom + window.scrollY + 6}px`; // account for scroll
-    overlay.style.width = 'auto'; // auto width for fallback
-    overlay.style.borderRadius = '0.75rem'; // full rounded corners for fallback
-  }
+  const rect = activeInput.getBoundingClientRect();
+  overlay.style.left = `${rect.left}px`;
+  overlay.style.top = `${rect.bottom + 6 + activeInput.scrollTop}px`; // account for scroll
+  overlay.style.width = `${rect.width}px`; // auto width for fallback
+  overlay.style.borderRadius = '0.75rem'; // full rounded corners for fallback
+  overlay.style.position = 'fixed';
+  overlay.style.margin = "0";
+  overlay.setAttribute("popover", "manual");
+  overlay.setAttribute("popover-target", activeInput.id);
+  overlay.hidePopover();
+  overlay.showPopover();
 };
 
 /**
@@ -434,7 +409,7 @@ window.GitHubMentionsDOM.getSelectedItem = function() {
  */
 window.GitHubMentionsDOM.getGitHubSuggestions = function() {
   try {
-    const githubOverlay = document.querySelector('[class*="AutocompleteSuggestions-module__Overlay"]');
+    const githubOverlay = getGithubOverlay();
     if (!githubOverlay || githubOverlay.style.display === 'none') {
       return [];
     }
