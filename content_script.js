@@ -352,7 +352,7 @@ function filterUsers(users, query) {
   }
 
   if (!query) {
-    return users.slice(0, 10); // Show all users when no query (max 10)
+    return users;
   }
 
   const lowerQuery = query.toLowerCase();
