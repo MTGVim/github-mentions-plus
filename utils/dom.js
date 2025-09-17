@@ -336,9 +336,7 @@ function updateSelection() {
  */
 window.GitHubMentionsDOM.hideOverlay = function() {
   if (overlay) {
-    // 팝오버 사용하지 않고 디스플레이 속성만으로 숨김
     overlay.style.display = 'none';
-    // 선택 인덱스와 항목 리스트 초기화
     selectedIndex = 0;
     overlayItems = [];
   }
@@ -349,7 +347,6 @@ window.GitHubMentionsDOM.hideOverlay = function() {
  * @returns {boolean} True if overlay is visible
  */
 window.GitHubMentionsDOM.isOverlayVisible = function() {
-  // 단순히 display 속성만 확인
   return overlay && overlay.style.display !== 'none';
 };
 
