@@ -442,7 +442,7 @@ async function onKeyUp(e) {
   
     // Handle @ mentions
     if (mentionQuery !== null) {
-      mentionStartPos = cursor - mentionQuery.length - 1; // position of the @
+      mentionStartPos = cursor - mentionQuery.length - 2; // position of the @@
     
       const users = await getUsersForSuggestions();
       const matches = filterUsers(users, mentionQuery);
