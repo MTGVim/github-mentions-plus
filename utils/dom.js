@@ -89,10 +89,8 @@ window.GitHubMentionsDOM.updateOverlayPosition = function(activeInput) {
   overlay.style.borderRadius = '0.75rem';
   overlay.style.position = 'fixed';
   overlay.style.margin = "0";
-  overlay.setAttribute("popover", "manual");
-  overlay.setAttribute("popover-target", activeInput.id);
-  overlay.hidePopover();
-  overlay.showPopover();
+  overlay.style.display = 'block';
+  overlay.style.zIndex = '9999';
 };
 
 /**
@@ -118,8 +116,10 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
 
   // Clear existing content and reset selection
   overlay.innerHTML = '';
-  selectedIndex = 0;
+  selectedIndex = 0; 
+  currentSelectedIndex = 0; 
   overlayItems = [];
+  lastKeyNavTime = 0;
 
   // Create suggestion items
   users.slice(0, 4).forEach((user, index) => {
@@ -135,11 +135,14 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
       align-items: center;
       padding: 0.5rem;
       cursor: pointer;
-      transition: background-color 0.1s ease;
+      transition: all 0.15s ease;
       background-color: ${isSelected ? selectedBgColor : defaultBgColor};
+      color: ${isSelected ? '#ffffff' : ''};
+      font-weight: ${isSelected ? '600' : 'normal'};
       border-radius: 0.375rem;
       margin: 0 0.5rem;
       list-style: none;
+      box-shadow: ${isSelected ? '0 0 0 1px rgba(255,255,255,0.1)' : 'none'};
     `;
     
     // Store user data and index for keyboard navigation
@@ -290,11 +293,40 @@ function updateSelection() {
   const selectedBgColor = isDarkMode ? '#1f6feb' : '#0969da';
   const defaultBgColor = 'transparent';
   
+  if (selectedIndex < 0 || selectedIndex >= overlayItems.length) {
+    selectedIndex = 0;
+    currentSelectedIndex = 0;
+  }
+  
+  // Current selected index 
+  currentSelectedIndex = selectedIndex;
+  
+  // Scroll selected item into view
+  if (overlayItems[selectedIndex]) {
+    try {
+      const selectedItem = overlayItems[selectedIndex];
+
+      selectedItem.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+    } catch (e) {
+      console.error('Error during scrollIntoView:', e);
+    }
+  }
+  
   overlayItems.forEach((item, index) => {
-    if (index === selectedIndex) {
-      item.style.backgroundColor = selectedBgColor;
-    } else {
-      item.style.backgroundColor = defaultBgColor;
+    try {
+      if (index === selectedIndex) {
+        item.style.backgroundColor = selectedBgColor;
+        item.style.color = '#ffffff';
+        item.style.fontWeight = '600';
+        item.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.1)';
+      } else {
+        item.style.backgroundColor = defaultBgColor;
+        item.style.color = '';
+        item.style.fontWeight = '';
+        item.style.boxShadow = 'none';
+      }
+    } catch (e) {
+      console.error('Error styling overlay item:', e);
     }
   });
 }
@@ -304,7 +336,9 @@ function updateSelection() {
  */
 window.GitHubMentionsDOM.hideOverlay = function() {
   if (overlay) {
+    // 팝오버 사용하지 않고 디스플레이 속성만으로 숨김
     overlay.style.display = 'none';
+    // 선택 인덱스와 항목 리스트 초기화
     selectedIndex = 0;
     overlayItems = [];
   }
@@ -315,6 +349,7 @@ window.GitHubMentionsDOM.hideOverlay = function() {
  * @returns {boolean} True if overlay is visible
  */
 window.GitHubMentionsDOM.isOverlayVisible = function() {
+  // 단순히 display 속성만 확인
   return overlay && overlay.style.display !== 'none';
 };
 
@@ -342,38 +377,82 @@ window.GitHubMentionsDOM.getOverlay = function() {
  * @param {KeyboardEvent} e - Keyboard event
  * @returns {boolean} True if event was handled
  */
+
+let lastKeyNavTime = 0;
+const KEY_NAV_DELAY = 200;
+let currentSelectedIndex = 0;
+
 window.GitHubMentionsDOM.handleKeyNavigation = function(e) {
   if (!overlay || overlay.style.display === 'none' || overlayItems.length === 0) {
     return false;
   }
   
+  // Validate selectedIndex
+  if (selectedIndex !== currentSelectedIndex && overlayItems.length > 0) {
+    // if valid range, sync selectedIndex
+    if (currentSelectedIndex >= 0 && currentSelectedIndex < overlayItems.length) {
+      selectedIndex = currentSelectedIndex;
+      updateSelection();
+    }
+  }
+  
+  const now = Date.now();
+  if (now - lastKeyNavTime < KEY_NAV_DELAY && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+    e.preventDefault();
+    return true; // Ignore rapid key presses
+  }
+  
+  let handled = false;
+  
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
-      selectedIndex = (selectedIndex + 1) % overlayItems.length;
-      updateSelection();
-      return true;
+      if (overlayItems.length > 1) { 
+        const newIndex = (selectedIndex + 1) % overlayItems.length;
+
+        if (newIndex !== selectedIndex) {
+          selectedIndex = newIndex;
+          currentSelectedIndex = selectedIndex;
+          updateSelection();
+          lastKeyNavTime = now;
+        }
+      }
+      handled = true;
+      break;
       
     case 'ArrowUp':
       e.preventDefault();
-      selectedIndex = (selectedIndex - 1 + overlayItems.length) % overlayItems.length;
-      updateSelection();
-      return true;
+      if (overlayItems.length > 1) {
+        const newIndex = (selectedIndex - 1 + overlayItems.length) % overlayItems.length;
+
+        if (newIndex !== selectedIndex) {
+          selectedIndex = newIndex;
+          currentSelectedIndex = selectedIndex;
+          updateSelection();
+          lastKeyNavTime = now;
+        }
+      }
+      handled = true;
+      break;
       
     case 'Enter':
       e.preventDefault();
       if (overlayItems[selectedIndex] && overlayItems[selectedIndex].userData) {
         return overlayItems[selectedIndex].userData;
       }
-      return false;
+      handled = false;
+      break;
       
     case 'Escape':
       window.GitHubMentionsDOM.hideOverlay();
-      return true;
+      handled = true;
+      break;
       
     default:
-      return false;
+      handled = false;
   }
+  
+  return handled;
 };
 
 /**
