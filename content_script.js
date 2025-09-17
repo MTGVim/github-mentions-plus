@@ -351,27 +351,12 @@ function filterUsers(users, query) {
     return [];
   }
 
-  // Get GitHub's current suggestions to avoid duplicates
-  let githubUsernames = [];
-
-  // Filter out users that GitHub is already suggesting
-  const filteredUsers = users.filter(user => 
-    !githubUsernames.some(githubUser => 
-      githubUser.toLowerCase() === user.username.toLowerCase()
-    )
-  );
-
-  if (filteredUsers.length === 0) {
-    return [];
-  }
-
-  // Only show suggestions when user has typed something after @
   if (!query) {
-    return [];
+    return users.slice(0, 10); // Show all users when no query (max 10)
   }
 
   const lowerQuery = query.toLowerCase();
-  const matchingUsers = filteredUsers.filter(user => 
+  const matchingUsers = users.filter(user => 
     user.username.toLowerCase().includes(lowerQuery) ||
     user.name.toLowerCase().includes(lowerQuery)
   );
