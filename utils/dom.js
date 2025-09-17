@@ -78,56 +78,21 @@ window.GitHubMentionsDOM.createOverlay = function() {
  * @param {HTMLElement} activeInput - The active input element
  */
 window.GitHubMentionsDOM.updateOverlayPosition = function(activeInput) {
-  if (!overlay) {
+  if (!overlay || !activeInput) {
     return;
   }
 
-  const githubOverlay = document.querySelector('[class*="AutocompleteSuggestions-module__Overlay"]');
-  if (githubOverlay) {
-    // Reset both overlays to auto width to measure natural content width
-    overlay.style.width = 'auto';
-    githubOverlay.style.width = 'auto';
-    
-    // Force a reflow to ensure the auto width is applied before measuring
-    overlay.offsetHeight;
-    githubOverlay.offsetHeight;
-    
-    const rect = githubOverlay.getBoundingClientRect();
-    const ourRect = overlay.getBoundingClientRect();
-    
-    // Calculate the optimal width - use the larger of the two overlays
-    const optimalWidth = Math.max(rect.width, ourRect.width);
-    
-    overlay.style.left = `${rect.left - 1}px`;
-    overlay.style.top = `${rect.bottom + window.scrollY}px`; // show below GitHub's while it's visible, account for scroll
-    overlay.style.width = `${optimalWidth}px`; // use the larger width
-    overlay.style.maxWidth = 'none'; // clear any max-width constraint
-    
-    // Adjust border radius to make overlays look connected
-    overlay.style.borderRadius = '0 0 0.75rem 0.75rem'; // no top corners when below GitHub
-    githubOverlay.style.borderRadius = '0.75rem 0.75rem 0 0'; // no bottom corners when above ours
-    
-    // Also set GitHub's overlay to the same width for consistency
-    githubOverlay.style.width = `${optimalWidth}px`;
-    
-    lastGoodPosition = {
-      left: rect.left,
-      top: rect.top + window.scrollY, // cache the top for future use, account for scroll
-      width: optimalWidth, // cache the optimal width for future use
-    };
-  } else if (lastGoodPosition) {
-    overlay.style.left = `${lastGoodPosition.left}px`;
-    overlay.style.top = `${lastGoodPosition.top}px`; // use top instead of bottom when GitHub is gone
-    overlay.style.width = 'auto'; // use auto width when GitHub is not visible
-    overlay.style.borderRadius = '0.75rem'; // restore full rounded corners when alone
-  } else if (activeInput) {
-    // fallback (only used if no GitHub overlay has ever been shown)
-    const rect = activeInput.getBoundingClientRect();
-    overlay.style.left = `${rect.left + 10}px`;
-    overlay.style.top = `${rect.bottom + window.scrollY + 6}px`; // account for scroll
-    overlay.style.width = 'auto'; // auto width for fallback
-    overlay.style.borderRadius = '0.75rem'; // full rounded corners for fallback
-  }
+  const rect = activeInput.getBoundingClientRect();
+  overlay.style.left = `${rect.left}px`;
+  overlay.style.top = `${rect.bottom + 6 + activeInput.scrollTop}px`;
+  overlay.style.width = `${rect.width}px`;
+  overlay.style.borderRadius = '0.75rem';
+  overlay.style.position = 'fixed';
+  overlay.style.margin = "0";
+  overlay.setAttribute("popover", "manual");
+  overlay.setAttribute("popover-target", activeInput.id);
+  overlay.hidePopover();
+  overlay.showPopover();
 };
 
 /**
@@ -342,12 +307,6 @@ window.GitHubMentionsDOM.hideOverlay = function() {
     overlay.style.display = 'none';
     selectedIndex = 0;
     overlayItems = [];
-    
-    // Restore GitHub's overlay border radius to fully rounded when our overlay is hidden
-    const githubOverlay = document.querySelector('[class*="AutocompleteSuggestions-module__Overlay"]');
-    if (githubOverlay) {
-      githubOverlay.style.borderRadius = '0.75rem';
-    }
   }
 };
 
@@ -427,53 +386,3 @@ window.GitHubMentionsDOM.getSelectedItem = function() {
   }
   return null;
 };
-
-/**
- * Get usernames from GitHub's current suggestions to avoid duplicates
- * @returns {Array<string>} Array of usernames currently shown by GitHub
- */
-window.GitHubMentionsDOM.getGitHubSuggestions = function() {
-  try {
-    const githubOverlay = document.querySelector('[class*="AutocompleteSuggestions-module__Overlay"]');
-    if (!githubOverlay || githubOverlay.style.display === 'none') {
-      return [];
-    }
-
-    // Look for suggestion items in GitHub's overlay
-    const suggestionItems = githubOverlay.querySelectorAll('[role="option"]');
-    
-    const usernames = [];
-    suggestionItems.forEach(item => {
-      // Try to extract username from various possible text patterns
-      const text = item.textContent || '';
-      
-      // Look for @username pattern
-      const atMatch = text.match(/@([a-zA-Z0-9-_]+)/);
-      if (atMatch) {
-        usernames.push(atMatch[1]);
-        return;
-      }
-      
-      // Look for username without @ (might be in a different element)
-      const usernameMatch = text.match(/([a-zA-Z0-9-_]+)/);
-      if (usernameMatch) {
-        usernames.push(usernameMatch[1]);
-        return;
-      }
-      
-      // Try to find username in child elements
-      const usernameElement = item.querySelector('[class*="username"], [class*="login"], strong, b');
-      if (usernameElement) {
-        const usernameText = usernameElement.textContent || '';
-        const cleanUsername = usernameText.replace(/@/, '').trim();
-        if (cleanUsername) {
-          usernames.push(cleanUsername);
-        }
-      }
-    });
-    
-    return usernames;
-  } catch (error) {
-    return [];
-  }
-}; 

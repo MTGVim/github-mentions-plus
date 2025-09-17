@@ -164,7 +164,7 @@ function insertMention(username) {
 }
 
 /**
- * Scan text for @ mention trigger
+ * Scan text for @@ mention trigger
  * @param {string} text - Text to scan
  * @param {number} pos - Cursor position
  * @returns {string|null} Username query or null
@@ -172,7 +172,7 @@ function insertMention(username) {
 function scanForTrigger(text, pos) {
   try {
     const slice = text.substring(0, pos);
-    const match = slice.match(/@([a-zA-Z0-9-_]*)$/);
+    const match = slice.match(/@@([a-zA-Z0-9-_]*)$/);
     return match ? match[1] : null;
   } catch (error) {
     return null;
@@ -353,9 +353,6 @@ function filterUsers(users, query) {
 
   // Get GitHub's current suggestions to avoid duplicates
   let githubUsernames = [];
-  if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.getGitHubSuggestions === 'function') {
-    githubUsernames = window.GitHubMentionsDOM.getGitHubSuggestions();
-  }
 
   // Filter out users that GitHub is already suggesting
   const filteredUsers = users.filter(user => 
