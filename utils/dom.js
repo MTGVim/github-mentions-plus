@@ -89,8 +89,21 @@ window.GitHubMentionsDOM.updateOverlayPosition = function(activeInput) {
   overlay.style.borderRadius = '0.75rem';
   overlay.style.position = 'fixed';
   overlay.style.margin = "0";
-  overlay.style.display = 'block';
-  overlay.style.zIndex = '9999';
+  
+  if (!overlay.hasAttribute("popover")) {
+    overlay.setAttribute("popover", "manual");
+    if (activeInput.id) {
+      overlay.setAttribute("popover-target", activeInput.id);
+    }
+  }
+  
+  if (!overlay.matches(':popover-open')) {
+    try {
+      overlay.showPopover();
+    } catch (e) {
+      // Ignore if already shown
+    }
+  }
 };
 
 /**
@@ -150,10 +163,12 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
     item.itemIndex = index;
     overlayItems.push(item);
 
-    // Add hover effects
+    // Add hover effects for mouse navigation
     item.addEventListener('mouseenter', () => {
-      selectedIndex = index;
-      updateSelection();
+      if (selectedIndex !== index) {
+        selectedIndex = index;
+        updateSelection();
+      }
     });
     
     item.addEventListener('mouseleave', () => {
@@ -336,6 +351,13 @@ function updateSelection() {
  */
 window.GitHubMentionsDOM.hideOverlay = function() {
   if (overlay) {
+    if (overlay.matches(':popover-open')) {
+      try {
+        overlay.hidePopover();
+      } catch (e) {
+        // Ignore if already closed
+      }
+    }
     overlay.style.display = 'none';
     selectedIndex = 0;
     overlayItems = [];
@@ -347,7 +369,7 @@ window.GitHubMentionsDOM.hideOverlay = function() {
  * @returns {boolean} True if overlay is visible
  */
 window.GitHubMentionsDOM.isOverlayVisible = function() {
-  return overlay && overlay.style.display !== 'none';
+  return overlay && (overlay.style.display !== 'none' || overlay.matches(':popover-open'));
 };
 
 /**
@@ -380,7 +402,7 @@ const KEY_NAV_DELAY = 200;
 let currentSelectedIndex = 0;
 
 window.GitHubMentionsDOM.handleKeyNavigation = function(e) {
-  if (!overlay || overlay.style.display === 'none' || overlayItems.length === 0) {
+  if (!overlay || !window.GitHubMentionsDOM.isOverlayVisible() || overlayItems.length === 0) {
     return false;
   }
   
@@ -404,9 +426,9 @@ window.GitHubMentionsDOM.handleKeyNavigation = function(e) {
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault();
+      e.stopPropagation();
       if (overlayItems.length > 1) { 
         const newIndex = (selectedIndex + 1) % overlayItems.length;
-
         if (newIndex !== selectedIndex) {
           selectedIndex = newIndex;
           currentSelectedIndex = selectedIndex;
@@ -414,14 +436,13 @@ window.GitHubMentionsDOM.handleKeyNavigation = function(e) {
           lastKeyNavTime = now;
         }
       }
-      handled = true;
-      break;
+      return true;
       
     case 'ArrowUp':
       e.preventDefault();
+      e.stopPropagation();
       if (overlayItems.length > 1) {
         const newIndex = (selectedIndex - 1 + overlayItems.length) % overlayItems.length;
-
         if (newIndex !== selectedIndex) {
           selectedIndex = newIndex;
           currentSelectedIndex = selectedIndex;
@@ -429,11 +450,11 @@ window.GitHubMentionsDOM.handleKeyNavigation = function(e) {
           lastKeyNavTime = now;
         }
       }
-      handled = true;
-      break;
+      return true;
       
     case 'Enter':
       e.preventDefault();
+      e.stopPropagation();
       if (overlayItems[selectedIndex] && overlayItems[selectedIndex].userData) {
         return overlayItems[selectedIndex].userData;
       }
@@ -441,6 +462,8 @@ window.GitHubMentionsDOM.handleKeyNavigation = function(e) {
       break;
       
     case 'Escape':
+      e.preventDefault();
+      e.stopPropagation();
       window.GitHubMentionsDOM.hideOverlay();
       handled = true;
       break;

@@ -392,29 +392,10 @@ async function onKeyUp(e) {
     return;
   }
 
-  // Check if overlay is visible and handle keyboard navigation first
-  if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.handleKeyNavigation === 'function') {
-    const handled = window.GitHubMentionsDOM.handleKeyNavigation(e);
-    if (handled === true) {
-      return; // Navigation keys were handled
-    } else if (handled && typeof handled === 'object') {
-      // Enter was pressed and returned selected item
-      const cursor = activeInput.selectionStart;
-      const text = activeInput.value;
-      const mentionQuery = scanForTrigger(text, cursor);
-      const commandInfo = scanForCommand(text, cursor);
-      
-      if (mentionQuery !== null) {
-        // Handle mention selection
-        insertMention(handled.username);
-      } else if (commandInfo && handled.isCommand) {
-        // Handle command selection
-        await executeCommand(handled.username, activeInput);
-      }
-      
-      window.GitHubMentionsDOM.hideOverlay();
-      return;
-    }
+
+  const navigationKeys = ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'];
+  if (navigationKeys.includes(e.key)) {
+    return;
   }
 
   // Only respond to alphanumeric characters, @, !, and control keys
@@ -789,58 +770,51 @@ function handleClickOutside(e) {
 }
 
 /**
- * Handle escape key press
- * @param {KeyboardEvent} e - Keydown event
+ * Handle keyboard navigation
+ * @param {KeyboardEvent} e 
  */
-function handleEscapeKey(e) {
+function handleKeyNavigation(e) {
+  if (!activeInput || !settings?.enabled) {
+    return;
+  }
+
   // First check if overlay handles the key
   if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.handleKeyNavigation === 'function') {
     const handled = window.GitHubMentionsDOM.handleKeyNavigation(e);
     if (handled === true) {
-      return; // Key was handled by overlay
+      return; // Navigation keys were handled
     } else if (handled && typeof handled === 'object') {
       // Enter was pressed and returned selected item
-      if (activeInput && settings?.enabled) {
-        const cursor = activeInput.selectionStart;
-        const text = activeInput.value;
-        const mentionQuery = scanForTrigger(text, cursor);
-        const commandInfo = scanForCommand(text, cursor);
-        
-        if (mentionQuery !== null) {
-          // Handle mention selection
-          insertMention(handled.username);
-        } else if (commandInfo && handled.isCommand) {
-          // Handle command selection
-          setTimeout(async () => {
-            await executeCommand(handled.username, activeInput);
-            if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
-              window.GitHubMentionsDOM.hideOverlay();
-            }
-          }, 0);
-        }
+      const cursor = activeInput.selectionStart;
+      const text = activeInput.value;
+      const mentionQuery = scanForTrigger(text, cursor);
+      const commandInfo = scanForCommand(text, cursor);
+      
+      if (mentionQuery !== null) {
+        // Handle mention selection
+        insertMention(handled.username);
+      } else if (commandInfo && handled.isCommand) {
+        // Handle command selection
+        setTimeout(async () => {
+          await executeCommand(handled.username, activeInput);
+        }, 0);
       }
+      
+      window.GitHubMentionsDOM.hideOverlay();
       return;
     }
   }
   
-  // Fallback for when overlay is not visible
-  if (e.key === 'Escape') {
-    if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
-      window.GitHubMentionsDOM.hideOverlay();
-    }
-  } else if (e.key === 'Enter' && activeInput && settings?.enabled) {
+  // Fallback handling for when overlay is not visible
+  if (e.key === 'Enter' && activeInput && settings?.enabled) {
     const cursor = activeInput.selectionStart;
     const text = activeInput.value;
     const commandInfo = scanForCommand(text, cursor);
     
     if (commandInfo) {
       e.preventDefault();
-      
       setTimeout(async () => {
         await executeCommand(commandInfo.command, activeInput);
-        if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
-          window.GitHubMentionsDOM.hideOverlay();
-        }
       }, 0);
     }
   }
@@ -850,7 +824,7 @@ function handleEscapeKey(e) {
 document.addEventListener('visibilitychange', handleVisibilityChange);
 window.addEventListener('resize', handleResize);
 document.addEventListener('click', handleClickOutside);
-document.addEventListener('keydown', handleEscapeKey);
+document.addEventListener('keydown', handleKeyNavigation);
 
 // Message listener for popup communication
 chrome.runtime.onMessage.addListener(handleMessage);
