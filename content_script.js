@@ -351,27 +351,12 @@ function filterUsers(users, query) {
     return [];
   }
 
-  // Get GitHub's current suggestions to avoid duplicates
-  let githubUsernames = [];
-
-  // Filter out users that GitHub is already suggesting
-  const filteredUsers = users.filter(user => 
-    !githubUsernames.some(githubUser => 
-      githubUser.toLowerCase() === user.username.toLowerCase()
-    )
-  );
-
-  if (filteredUsers.length === 0) {
-    return [];
-  }
-
-  // Only show suggestions when user has typed something after @
   if (!query) {
-    return [];
+    return users;
   }
 
   const lowerQuery = query.toLowerCase();
-  const matchingUsers = filteredUsers.filter(user => 
+  const matchingUsers = users.filter(user => 
     user.username.toLowerCase().includes(lowerQuery) ||
     user.name.toLowerCase().includes(lowerQuery)
   );
@@ -442,7 +427,7 @@ async function onKeyUp(e) {
   
     // Handle @ mentions
     if (mentionQuery !== null) {
-      mentionStartPos = cursor - mentionQuery.length - 1; // position of the @
+      mentionStartPos = cursor - mentionQuery.length - 2; // position of the @@
     
       const users = await getUsersForSuggestions();
       const matches = filterUsers(users, mentionQuery);
