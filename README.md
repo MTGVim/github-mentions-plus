@@ -1,4 +1,4 @@
-> ⚠️ This project is a fork of [a8cteam51/github-mentions-plus](https://github.com/a8cteam51/github-mentions-plus), which is no longer maintained. 🥲
+> ⚠️ This project is a fork of [a8cteam51/github-mentions-plus](https://github.com/a8cteam51/github-mentions-plus), which is no longer maintained or functional.
 
 # GitHub Mentions+ Extension
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
