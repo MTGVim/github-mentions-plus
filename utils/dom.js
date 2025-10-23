@@ -24,6 +24,10 @@ let lastGoodPosition = null;
 let selectedIndex = 0;
 let overlayItems = [];
 
+window.GitHubMentionsDOM.getSelectedBgColor = function(isDarkMode) {
+  return isDarkMode ? '#1f6feb' : '#9ec9f9ff';
+}
+
 /**
  * Create the mentions overlay element
  * @returns {HTMLElement} The created overlay element
@@ -140,7 +144,6 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
     item.className = 'github-mentions-item';
     const isSelected = index === selectedIndex;
     const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const selectedBgColor = isDarkMode ? '#1f6feb' : '#0969da';
     const defaultBgColor = 'transparent';
     
     item.style.cssText = `
@@ -149,7 +152,7 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
       padding: 0.5rem;
       cursor: pointer;
       transition: all 0.15s ease;
-      background-color: ${isSelected ? selectedBgColor : defaultBgColor};
+      background-color: ${isSelected ? window.GitHubMentionsDOM.getSelectedBgColor(isDarkMode) : defaultBgColor};
       color: ${isSelected ? '#ffffff' : ''};
       font-weight: ${isSelected ? '600' : 'normal'};
       border-radius: 0.375rem;
@@ -305,7 +308,7 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
  */
 function updateSelection() {
   const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const selectedBgColor = isDarkMode ? '#1f6feb' : '#0969da';
+  const selectedBgColor = window.GitHubMentionsDOM.getSelectedBgColor(isDarkMode);
   const defaultBgColor = 'transparent';
   
   if (selectedIndex < 0 || selectedIndex >= overlayItems.length) {
