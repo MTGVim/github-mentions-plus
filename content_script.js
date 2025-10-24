@@ -38,7 +38,7 @@ async function initialize() {
 
     // Start scanning for inputs
     scanInputs();
-    setInterval(scanInputs, 1000);
+    setInterval(scanInputs, 1e3/30); // 초당 30회 스캔
 
     isInitialized = true;
   } catch (error) {
