@@ -21,12 +21,16 @@
             <label>Data Source</label>
             <div class="radio-group">
               <label class="radio-option">
-                <input type="radio" name="dataSource" value="endpoint" checked />
-                <span class="radio-label">HTTP Endpoint</span>
+                <input type="radio" name="dataSource" value="gui" checked/>
+                <span class="radio-label">Local</span>
               </label>
               <label class="radio-option">
                 <input type="radio" name="dataSource" value="direct" />
-                <span class="radio-label">Direct JSON Input</span>
+                <span class="radio-label">Local(JSON)</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="dataSource" value="endpoint" />
+                <span class="radio-label">HTTP Endpoint</span>
               </label>
             </div>
           </div>
@@ -82,7 +86,7 @@
                 Enter JSON array of user objects. Each user must have <code>username</code> and <code>name</code> fields. <code>avatar</code> is optional.
               </small>
             </div>
-
+            
             <div class="form-group">
               <button id="validateJson" class="btn btn-secondary">
                 Validate JSON
@@ -93,6 +97,42 @@
             </div>
           </div>
 
+          <!-- GUI Settings -->
+          <div id="guiJsonSection" class="data-source-section hidden">
+            <h3>Local User Management</h3>
+            
+            <!-- GUI Table for User Data -->
+            <div class="form-group">
+              <label>User Data</label>
+              <div class="user-table-container">
+                <table class="user-table" id="userTable">
+                  <thead>
+                    <tr>
+                      <th>Username <span class="required">*</span></th>
+                      <th>Name</th>
+                      <th>Profile</th>
+                      <th style="width: 60px;">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="userTableBody">
+                    <!-- Rows will be added dynamically -->
+                  </tbody>
+                </table>
+              </div>
+              <small class="help-text">
+                <code>username</code> is required. Click "Add Row" to add more users.
+              </small>
+            </div>
+            
+            <div class="form-group">
+              <button id="addUserRow" class="btn btn-secondary">
+                + Add Row
+              </button>
+              <button id="loadGuiUsers" class="btn btn-primary">
+                Load Users
+              </button>
+            </div>
+          </div>
           <div id="endpointStatus" class="status-indicator hidden">
             <div class="status-icon"></div>
             <span class="status-text"></span>
