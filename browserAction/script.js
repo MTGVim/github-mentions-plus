@@ -22,6 +22,9 @@ const cacheStatus = document.getElementById('cacheStatus');
 const commandsGrid = document.getElementById('commandsGrid');
 const addCommandBtn = document.getElementById('addCommand');
 const commandCountDisplay = document.getElementById('commandCount');
+const userTableBody = document.getElementById('userTableBody');
+const addUserRowBtn = document.getElementById('addUserRow');
+const loadGuiUsersBtn = document.getElementById('loadGuiUsers');
 
 // Modal elements
 const commandModal = document.getElementById('commandModal');
@@ -71,6 +74,12 @@ async function initialize() {
     // Load and display commands
     updateCommandsGrid();
     
+    // Load user table data if GUI tab is selected
+    const selectedDataSource = document.querySelector('input[name="dataSource"]:checked')?.value;
+    if (selectedDataSource === 'gui') {
+      loadUserTableData();
+    }
+    
   } catch (error) {
     // Silently handle initialization errors
   }
@@ -84,7 +93,7 @@ async function loadSettings() {
     // Use storage utilities directly instead of messaging
     const settings = await window.GitHubMentionsStorage.getSettings();
     currentSettings = settings;
-    updateUI();
+    updateSettingUI();
   } catch (error) {
     // Silently handle loading errors
   }
@@ -93,7 +102,7 @@ async function loadSettings() {
 /**
  * Update UI with current settings
  */
-function updateUI() {
+function updateSettingUI() {
   if (currentSettings) {
     // Set data source radio button
     const dataSource = currentSettings.dataSource || 'endpoint';
@@ -105,8 +114,11 @@ function updateUI() {
     }
     
     // Set direct JSON data if exists
+    // 기본값을 빈 배열 []로 설정
     if (currentSettings.directJsonData) {
       directJsonData.value = currentSettings.directJsonData;
+    } else {
+      directJsonData.value = '[]';
     }
     
     // Update section visibility
@@ -119,13 +131,23 @@ function updateUI() {
  */
 function updateDataSourceSection() {
   const selectedDataSource = document.querySelector('input[name="dataSource"]:checked').value;
-  
+  const show = (el) => el.classList.remove('hidden');
+  const hide = (el) => el.classList.add('hidden');
+
   if (selectedDataSource === 'endpoint') {
-    endpointSection.classList.remove('hidden');
-    directJsonSection.classList.add('hidden');
-  } else {
-    endpointSection.classList.add('hidden');
-    directJsonSection.classList.remove('hidden');
+    show(endpointSection);
+    hide(directJsonSection);
+    hide(guiJsonSection);
+  } else if (selectedDataSource === 'direct') {
+    hide(endpointSection);
+    show(directJsonSection);
+    hide(guiJsonSection);
+  } else if (selectedDataSource === 'gui') {
+    hide(endpointSection);
+    hide(directJsonSection);
+    show(guiJsonSection);
+    // Load table data when switching to GUI tab
+    loadUserTableData();
   }
 }
 
@@ -136,10 +158,15 @@ async function saveSettings() {
   try {
     const selectedDataSource = document.querySelector('input[name="dataSource"]:checked').value;
     
+    // If GUI mode, sync table to JSON first
+    if (selectedDataSource === 'gui') {
+      syncTableToJson();
+    }
+    
     const newSettings = {
       dataSource: selectedDataSource,
       endpointUrl: selectedDataSource === 'endpoint' ? endpointUrlInput.value.trim() : '',
-      directJsonData: selectedDataSource === 'direct' ? directJsonData.value.trim() : '',
+      directJsonData: (selectedDataSource === 'direct' || selectedDataSource === 'gui') ? directJsonData.value.trim() : '',
       enabled: true,
       customCommands: currentSettings?.customCommands || {}
     };
@@ -283,7 +310,7 @@ function validateJson() {
  */
 async function loadDirectUsers() {
   const jsonText = directJsonData.value.trim();
-  if (!jsonText) {
+  if (!jsonText || jsonText === '[]') {
     showError('Please enter JSON data');
     return;
   }
@@ -295,14 +322,14 @@ async function loadDirectUsers() {
     const data = JSON.parse(jsonText);
     
     if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('Invalid JSON data');
+      throw new Error('Invalid JSON data - array is empty');
     }
     
     // Validate user data structure
     const validUsers = data.filter(user => 
       user && typeof user === 'object' &&
       typeof user.username === 'string' &&
-      typeof user.name === 'string' &&
+      (user.name === undefined || typeof user.name === 'string') &&
       (user.avatar === undefined || typeof user.avatar === 'string')
     );
     
@@ -311,7 +338,13 @@ async function loadDirectUsers() {
     }
     
     // Cache the users
-    const success = await window.GitHubMentionsStorage.setCachedUsers(validUsers);
+    const usersToCache = validUsers.map(user => ({
+      username: user.username,
+      name: user.name || user.username,
+      avatar: user.avatar || ''
+    }));
+    
+    const success = await window.GitHubMentionsStorage.setCachedUsers(usersToCache);
     if (success) {
       showSuccess(`Successfully loaded ${validUsers.length} users from JSON input`);
       updateStatus();
@@ -325,6 +358,70 @@ async function loadDirectUsers() {
   } finally {
     loadDirectUsersBtn.disabled = false;
     loadDirectUsersBtn.textContent = 'Load Users';
+  }
+}
+
+/**
+ * Load users from GUI table
+ */
+async function loadGuiUsers() {
+  // Validate all rows first
+  if (!validateAllRows()) {
+    showError('Please fill in all required fields (username)');
+    return;
+  }
+  
+  // Sync table data to JSON
+  syncTableToJson();
+  
+  const jsonText = directJsonData.value.trim();
+  if (!jsonText) {
+    showError('Please add at least one user');
+    return;
+  }
+
+  loadGuiUsersBtn.disabled = true;
+  loadGuiUsersBtn.textContent = 'Loading...';
+
+  try {
+    const data = JSON.parse(jsonText);
+    
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('Invalid JSON data - please add at least one user with username');
+    }
+    
+    // Validate user data structure (username is required)
+    const validUsers = data.filter(user => 
+      user && typeof user === 'object' &&
+      typeof user.username === 'string' &&
+      user.username.trim() !== ''
+    );
+    
+    if (validUsers.length === 0) {
+      throw new Error('No valid user data found - username is required');
+    }
+    
+    // Cache the users (convert profile to avatar for compatibility)
+    const usersToCache = validUsers.map(user => ({
+      username: user.username,
+      name: user.name || user.username,
+      avatar: user.profile || user.avatar || ''
+    }));
+    
+    const success = await window.GitHubMentionsStorage.setCachedUsers(usersToCache);
+    if (success) {
+      showSuccess(`Successfully loaded ${validUsers.length} users from table`);
+      updateStatus();
+    } else {
+      showError('Failed to cache user data - storage error');
+    }
+    
+  } catch (error) {
+    console.error('Load GUI users error:', error);
+    showError(`Failed to load users: ${error.message}`);
+  } finally {
+    loadGuiUsersBtn.disabled = false;
+    loadGuiUsersBtn.textContent = 'Load Users';
   }
 }
 
@@ -492,10 +589,24 @@ function setupEventListeners() {
   refreshUsersBtn.addEventListener('click', refreshUsers);
   
   // Validate JSON button
-  validateJsonBtn.addEventListener('click', validateJson);
+  if (validateJsonBtn) {
+    validateJsonBtn.addEventListener('click', validateJson);
+  }
   
   // Load direct users button
-  loadDirectUsersBtn.addEventListener('click', loadDirectUsers);
+  if (loadDirectUsersBtn) {
+    loadDirectUsersBtn.addEventListener('click', loadDirectUsers);
+  }
+  
+  // Load GUI users button
+  if (loadGuiUsersBtn) {
+    loadGuiUsersBtn.addEventListener('click', loadGuiUsers);
+  }
+  
+  // Add user row button
+  if (addUserRowBtn) {
+    addUserRowBtn.addEventListener('click', () => addUserRow());
+  }
   
   // Add command button
   if (addCommandBtn) {
@@ -995,6 +1106,169 @@ async function saveSettingsAndRefresh() {
   } catch (error) {
     // Silently handle notification errors
   }
+}
+
+/**
+ * Load user table data from directJsonData
+ */
+function loadUserTableData() {
+  // Only load if userTableBody exists (GUI tab)
+  if (!userTableBody) return;
+  
+  // 이미 테이블에 row가 있으면 다시 로드하지 않음 (중복 방지)
+  if (userTableBody.children.length > 0) return;
+  
+  try {
+    const jsonText = directJsonData.value.trim();
+    if (!jsonText || jsonText === '[]') {
+      // Add one empty row by default
+      addUserRow();
+      return;
+    }
+    
+    const users = JSON.parse(jsonText);
+    if (Array.isArray(users) && users.length > 0) {
+      // Clear existing rows
+      userTableBody.innerHTML = '';
+      
+      // Add rows from data (username, name, profile 순서)
+      users.forEach(user => {
+        addUserRow(user.username || '', user.name || '', user.profile || '');
+      });
+    } else {
+      // Add one empty row by default
+      addUserRow();
+    }
+  } catch (error) {
+    // If JSON is invalid, add one empty row
+    addUserRow();
+  }
+}
+
+/**
+ * Add a new user row to the table
+ */
+function addUserRow(username = '', name = '', profile = '') {
+  const row = document.createElement('tr');
+  row.innerHTML = `
+    <td>
+      <input type="text" class="user-username" value="${escapeHtml(username)}" placeholder="john-doe" required />
+    </td>
+    <td>
+      <input type="text" class="user-name" value="${escapeHtml(name)}" placeholder="John Doe" />
+    </td>
+    <td>
+      <input type="text" class="user-profile" value="${escapeHtml(profile)}" placeholder="https://example.com" />
+    </td>
+    <td>
+      <button class="btn btn-danger btn-mini delete-user-row">Delete</button>
+    </td>
+  `;
+  
+  // Add event listeners
+  const deleteBtn = row.querySelector('.delete-user-row');
+  deleteBtn.addEventListener('click', () => deleteUserRow(row));
+  
+  // Add input validation for username
+  const usernameInput = row.querySelector('.user-username');
+  usernameInput.addEventListener('input', () => validateUserRow(row));
+  usernameInput.addEventListener('blur', () => validateUserRow(row));
+  
+  // Add input listeners to sync data to JSON
+  row.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', syncTableToJson);
+  });
+  
+  userTableBody.appendChild(row);
+  
+  // Sync data to JSON
+  syncTableToJson();
+}
+
+/**
+ * Delete a user row from the table
+ */
+function deleteUserRow(row) {
+  row.remove();
+  
+  // If no rows left, add one empty row
+  if (userTableBody.children.length === 0) {
+    addUserRow();
+  }
+  
+  // Sync data to JSON
+  syncTableToJson();
+}
+
+/**
+ * Validate a user row (username is required)
+ */
+function validateUserRow(row) {
+  const usernameInput = row.querySelector('.user-username');
+  const username = usernameInput.value.trim();
+  
+  if (!username) {
+    usernameInput.classList.add('invalid');
+    row.classList.add('error');
+    return false;
+  } else {
+    usernameInput.classList.remove('invalid');
+    row.classList.remove('error');
+    return true;
+  }
+}
+
+/**
+ * Sync table data to directJsonData (as JSON)
+ */
+function syncTableToJson() {
+  if (!userTableBody) return;
+  
+  const rows = userTableBody.querySelectorAll('tr');
+  const users = [];
+  
+  rows.forEach(row => {
+    const username = row.querySelector('.user-username').value.trim();
+    const name = row.querySelector('.user-name').value.trim();
+    const profile = row.querySelector('.user-profile').value.trim();
+    
+    // Only add rows with username (required field)
+    if (username) {
+      users.push({
+        username: username,
+        name: name || '',
+        profile: profile || ''
+      });
+    }
+  });
+  
+  // Update directJsonData value (기본값은 빈 배열)
+  directJsonData.value = users.length > 0 ? JSON.stringify(users, null, 2) : '[]';
+}
+
+/**
+ * Validate all rows in the table
+ */
+function validateAllRows() {
+  const rows = userTableBody.querySelectorAll('tr');
+  let allValid = true;
+  
+  rows.forEach(row => {
+    if (!validateUserRow(row)) {
+      allValid = false;
+    }
+  });
+  
+  return allValid;
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 // Initialize when DOM is ready

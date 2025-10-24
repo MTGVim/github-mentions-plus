@@ -795,3 +795,96 @@
     position: relative;
   }
   
+  /* User Table Styles */
+  .user-table-container {
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    background-color: #ffffff;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .user-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .user-table thead {
+    background-color: #f6f8fa;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .user-table th {
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    color: #24292f;
+    font-size: 12px;
+    border-bottom: 2px solid #d0d7de;
+    white-space: nowrap;
+  }
+  
+  .user-table th .required {
+    color: #cf222e;
+    font-weight: bold;
+    margin-left: 2px;
+  }
+  
+  .user-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f6f8fa;
+  }
+  
+  .user-table tbody tr:hover {
+    background-color: #f6f8fa;
+  }
+  
+  .user-table tbody tr.error {
+    background-color: #ffebe9;
+  }
+  
+  .user-table input {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid #d0d7de;
+    border-radius: 4px;
+    font-size: 12px;
+    background-color: #ffffff;
+    transition: border-color 0.15s ease-in-out;
+  }
+  
+  .user-table input:focus {
+    outline: none;
+    border-color: #0969da;
+    box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.1);
+  }
+  
+  .user-table input.invalid {
+    border-color: #cf222e;
+    background-color: #ffebe9;
+  }
+  
+  .user-table .btn-danger {
+    background-color: #cf222e;
+    border-color: #cf222e;
+    color: #ffffff;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  
+  .user-table .btn-danger:hover {
+    background-color: #a40e26;
+    border-color: #a40e26;
+  }
+  
+  .user-table-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #656d76;
+    font-size: 14px;
+  }
+  
