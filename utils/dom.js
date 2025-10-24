@@ -110,6 +110,10 @@ window.GitHubMentionsDOM.updateOverlayPosition = function(activeInput) {
   }
 };
 
+window.GitHubMentionsDOM.isActiveInputInDialog = function(activeInput) {
+  return activeInput && activeInput?.closest('[role="dialog"]');
+}
+
 /**
  * Show the overlay with user suggestions
  * @param {UserData[]} users - Array of user data to display
@@ -138,6 +142,22 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
   overlayItems = [];
   lastKeyNavTime = 0;
 
+  /** 모달 내에서 아이템 클릭 시, github의 모달이 clickAway로 해석하여 스스로 닫히는 문제가 있어, 키보드로 선택만 허용 (251024, tk) */
+  const isInDialog = window.GitHubMentionsDOM.isActiveInputInDialog(activeInput);
+  if(isInDialog) {
+    const keyboardOnlyGuide = document.createElement('div');
+    keyboardOnlyGuide.style.cssText = `
+      padding: 8px;
+      color: gray;
+      font-weight: 600;
+      background-color: rgba(243, 221, 127, 0.9);
+      border-radius: 0.375rem;
+      margin: 0 0.5rem;
+    `;
+    keyboardOnlyGuide.textContent = '⚠️ 모달 내에서는 클릭 시 모달이 닫힙니다.\n키보드로 선택 하세요. (화살표, 엔터, ESC)';
+    overlay.appendChild(keyboardOnlyGuide);
+  }
+
   // Create suggestion items
   users.slice(0, 4).forEach((user, index) => {
     const item = document.createElement('div');
@@ -150,7 +170,7 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
       display: flex;
       align-items: center;
       padding: 0.5rem;
-      cursor: pointer;
+      cursor: ${isInDialog ? 'not-allowed' : 'pointer'};
       transition: all 0.15s ease;
       background-color: ${isSelected ? window.GitHubMentionsDOM.getSelectedBgColor(isDarkMode) : defaultBgColor};
       color: ${isSelected ? '#ffffff' : ''};
@@ -296,6 +316,7 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
 
   // Make overlay visible first so we can measure its width
   overlay.style.display = 'block';
+
   
   // Update position after showing
   if (typeof window.GitHubMentionsDOM.updateOverlayPosition === 'function') {
