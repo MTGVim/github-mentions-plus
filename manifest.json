@@ -16,8 +16,7 @@
 		"storage"
 	],
 	"host_permissions": [
-		"*://*.github.com/*",
-		"<all_urls>"
+		"*://*.github.com/*"
 	],
 	"content_scripts": [
 		{
