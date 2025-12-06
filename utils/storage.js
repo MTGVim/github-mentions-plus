@@ -21,9 +21,8 @@ window.GitHubMentionsStorage = {};
 
 /**
  * @typedef {Object} Settings
- * @property {string} dataSource - Data source type: "endpoint" or "direct"
- * @property {string} endpointUrl - Custom endpoint URL (when dataSource is "endpoint")
- * @property {string} directJsonData - Direct JSON data (when dataSource is "direct")
+ * @property {string} dataSource - Data source type: "direct" or "gui"
+ * @property {string} directJsonData - Direct JSON data (used by both "direct" and "gui")
  * @property {boolean} enabled - Whether extension is enabled
  * @property {Object<string, string>} customCommands - Custom command scripts
  */
@@ -161,16 +160,14 @@ window.GitHubMentionsStorage.getSettings = async function() {
   try {
     const result = await chrome.storage.local.get('githubMentions_settings');
     return result.githubMentions_settings || {
-      dataSource: 'endpoint',
-      endpointUrl: '',
+      dataSource: 'gui',
       directJsonData: '',
       enabled: true,
       customCommands: {}
     };
   } catch (error) {
     return {
-      dataSource: 'endpoint',
-      endpointUrl: '',
+      dataSource: 'gui',
       directJsonData: '',
       enabled: true,
       customCommands: {}
@@ -187,8 +184,7 @@ window.GitHubMentionsStorage.setSettings = async function(settings) {
   try {
     await chrome.storage.local.set({
       'githubMentions_settings': {
-        dataSource: settings.dataSource || 'endpoint',
-        endpointUrl: settings.endpointUrl || '',
+        dataSource: settings.dataSource || 'gui',
         directJsonData: settings.directJsonData || '',
         enabled: settings.enabled !== false,
         customCommands: settings.customCommands || {}

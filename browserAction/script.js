@@ -1,20 +1,15 @@
 /**
  * GitHub Mentions+ Settings Popup Script
- * Handles settings management, endpoint testing, and direct JSON input
+ * Handles settings management and direct JSON input
  */
 
 // DOM elements
 const dataSourceRadios = document.querySelectorAll('input[name="dataSource"]');
-const endpointSection = document.getElementById('endpointSection');
 const directJsonSection = document.getElementById('directJsonSection');
-const endpointUrlInput = document.getElementById('endpointUrl');
+const guiJsonSection = document.getElementById('guiJsonSection');
 const directJsonData = document.getElementById('directJsonData');
-const testEndpointBtn = document.getElementById('testEndpoint');
-const refreshUsersBtn = document.getElementById('refreshUsers');
 const validateJsonBtn = document.getElementById('validateJson');
-const loadDirectUsersBtn = document.getElementById('loadDirectUsers');
 const saveSettingsBtn = document.getElementById('saveSettings');
-const endpointStatus = document.getElementById('endpointStatus');
 const extensionStatus = document.getElementById('extensionStatus');
 const dataSourceStatus = document.getElementById('dataSourceStatus');
 const cachedUsersCount = document.getElementById('cachedUsersCount');
@@ -24,7 +19,6 @@ const addCommandBtn = document.getElementById('addCommand');
 const commandCountDisplay = document.getElementById('commandCount');
 const userTableBody = document.getElementById('userTableBody');
 const addUserRowBtn = document.getElementById('addUserRow');
-const loadGuiUsersBtn = document.getElementById('loadGuiUsers');
 
 // Modal elements
 const commandModal = document.getElementById('commandModal');
@@ -104,13 +98,11 @@ async function loadSettings() {
  */
 function updateSettingUI() {
   if (currentSettings) {
-    // Set data source radio button
-    const dataSource = currentSettings.dataSource || 'endpoint';
-    document.querySelector(`input[name="dataSource"][value="${dataSource}"]`).checked = true;
-    
-    // Set endpoint URL if exists
-    if (currentSettings.endpointUrl) {
-      endpointUrlInput.value = currentSettings.endpointUrl;
+    // Set data source radio button (default to 'gui')
+    const dataSource = currentSettings.dataSource || 'gui';
+    const radio = document.querySelector(`input[name="dataSource"][value="${dataSource}"]`);
+    if (radio) {
+      radio.checked = true;
     }
     
     // Set direct JSON data if exists
@@ -134,16 +126,10 @@ function updateDataSourceSection() {
   const show = (el) => el.classList.remove('hidden');
   const hide = (el) => el.classList.add('hidden');
 
-  if (selectedDataSource === 'endpoint') {
-    show(endpointSection);
-    hide(directJsonSection);
-    hide(guiJsonSection);
-  } else if (selectedDataSource === 'direct') {
-    hide(endpointSection);
+  if (selectedDataSource === 'direct') {
     show(directJsonSection);
     hide(guiJsonSection);
   } else if (selectedDataSource === 'gui') {
-    hide(endpointSection);
     hide(directJsonSection);
     show(guiJsonSection);
     // Load table data when switching to GUI tab
@@ -158,24 +144,64 @@ async function saveSettings() {
   try {
     const selectedDataSource = document.querySelector('input[name="dataSource"]:checked').value;
     
-    // If GUI mode, sync table to JSON first
+    if (!validateAllRows()) {
+      showError('Please fill in all required fields (username is required for all users).');
+      return; // Stop saving
+    }
+
+    // If GUI mode, validate all rows first
     if (selectedDataSource === 'gui') {
       syncTableToJson();
     }
     
+    const jsonData = (selectedDataSource === 'direct' || selectedDataSource === 'gui') ? directJsonData.value.trim() : '';
+    
     const newSettings = {
       dataSource: selectedDataSource,
-      endpointUrl: selectedDataSource === 'endpoint' ? endpointUrlInput.value.trim() : '',
-      directJsonData: (selectedDataSource === 'direct' || selectedDataSource === 'gui') ? directJsonData.value.trim() : '',
+      directJsonData: jsonData,
       enabled: true,
       customCommands: currentSettings?.customCommands || {}
     };
+    
+    // Validate and cache users before saving settings
+    if (jsonData && jsonData !== '[]') {
+      try {
+        const data = JSON.parse(jsonData);
+        if (Array.isArray(data) && data.length > 0) {
+          // Validate user data structure
+          const validUsers = data.filter(user => 
+            user && typeof user === 'object' &&
+            typeof user.username === 'string' &&
+            user.username.trim() !== ''
+          ).map(user => ({
+            username: user.username,
+            name: user.name || user.username,
+            avatar: user.avatar || user.profile || ''
+          }));
+          
+          if (validUsers.length === 0) {
+            showError('No valid users found. Please add at least one user with a username.');
+            return; // Stop saving
+          }
+          
+          // Cache the users
+          const cacheSuccess = await window.GitHubMentionsStorage.setCachedUsers(validUsers);
+          if (!cacheSuccess) {
+            showError('Failed to cache user data. Please try again.');
+            return; // Stop saving
+          }
+        }
+      } catch (error) {
+        showError(`Invalid JSON format: ${error.message}. Please fix and try again.`);
+        return; // Stop saving
+      }
+    }
     
     // Use storage utilities directly
     const success = await window.GitHubMentionsStorage.setSettings(newSettings);
     
     if (success) {
-      currentSettings = newSettings;
+      currentSettings = newSettings;      
       showSuccess('Settings saved successfully');
       
       // Update status after saving
@@ -186,74 +212,6 @@ async function saveSettings() {
     
   } catch (error) {
     showError('Failed to save settings');
-  }
-}
-
-/**
- * Test the configured endpoint
- */
-async function testEndpoint() {
-  const url = endpointUrlInput.value.trim();
-  if (!url) {
-    showError('Please enter an endpoint URL');
-    return;
-  }
-
-  testEndpointBtn.disabled = true;
-  testEndpointBtn.textContent = 'Testing...';
-
-  try {
-    console.log('Testing endpoint:', url);
-    
-    // Test the endpoint directly
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      mode: 'cors' // Enable CORS
-    });
-    
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-    
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'No error details available');
-      console.error('HTTP Error Response:', errorText);
-      throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${errorText}`);
-    }
-    
-    const data = await response.json();
-    console.log('Response data:', data);
-    
-    if (Array.isArray(data) && data.length > 0) {
-      showSuccess(`Endpoint test successful! Found ${data.length} users.`);
-    } else if (Array.isArray(data)) {
-      showError('Endpoint returned an empty array - no users found');
-    } else {
-      showError('Endpoint returned invalid data format - expected JSON array');
-    }
-  } catch (error) {
-    console.error('Endpoint test error:', error);
-    
-    // Provide more specific error messages
-    let errorMessage = 'Endpoint test failed: ';
-    
-    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-      errorMessage += 'Network error - check if the URL is accessible and CORS is enabled';
-    } else if (error.name === 'SyntaxError') {
-      errorMessage += 'Invalid JSON response from endpoint';
-    } else if (error.message.includes('CORS')) {
-      errorMessage += 'CORS error - the endpoint must allow cross-origin requests';
-    } else {
-      errorMessage += error.message;
-    }
-    
-    showError(errorMessage);
-  } finally {
-    testEndpointBtn.disabled = false;
-    testEndpointBtn.textContent = 'Test Endpoint';
   }
 }
 
@@ -306,200 +264,6 @@ function validateJson() {
 }
 
 /**
- * Load users from direct JSON input
- */
-async function loadDirectUsers() {
-  const jsonText = directJsonData.value.trim();
-  if (!jsonText || jsonText === '[]') {
-    showError('Please enter JSON data');
-    return;
-  }
-
-  loadDirectUsersBtn.disabled = true;
-  loadDirectUsersBtn.textContent = 'Loading...';
-
-  try {
-    const data = JSON.parse(jsonText);
-    
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('Invalid JSON data - array is empty');
-    }
-    
-    // Validate user data structure
-    const validUsers = data.filter(user => 
-      user && typeof user === 'object' &&
-      typeof user.username === 'string' &&
-      (user.name === undefined || typeof user.name === 'string') &&
-      (user.avatar === undefined || typeof user.avatar === 'string')
-    );
-    
-    if (validUsers.length === 0) {
-      throw new Error('No valid user data found');
-    }
-    
-    // Cache the users
-    const usersToCache = validUsers.map(user => ({
-      username: user.username,
-      name: user.name || user.username,
-      avatar: user.avatar || ''
-    }));
-    
-    const success = await window.GitHubMentionsStorage.setCachedUsers(usersToCache);
-    if (success) {
-      showSuccess(`Successfully loaded ${validUsers.length} users from JSON input`);
-      updateStatus();
-    } else {
-      showError('Failed to cache user data - storage error');
-    }
-    
-  } catch (error) {
-    console.error('Load direct users error:', error);
-    showError(`Failed to load users: ${error.message}`);
-  } finally {
-    loadDirectUsersBtn.disabled = false;
-    loadDirectUsersBtn.textContent = 'Load Users';
-  }
-}
-
-/**
- * Load users from GUI table
- */
-async function loadGuiUsers() {
-  // Validate all rows first
-  if (!validateAllRows()) {
-    showError('Please fill in all required fields (username)');
-    return;
-  }
-  
-  // Sync table data to JSON
-  syncTableToJson();
-  
-  const jsonText = directJsonData.value.trim();
-  if (!jsonText) {
-    showError('Please add at least one user');
-    return;
-  }
-
-  loadGuiUsersBtn.disabled = true;
-  loadGuiUsersBtn.textContent = 'Loading...';
-
-  try {
-    const data = JSON.parse(jsonText);
-    
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('Invalid JSON data - please add at least one user with username');
-    }
-    
-    // Validate user data structure (username is required)
-    const validUsers = data.filter(user => 
-      user && typeof user === 'object' &&
-      typeof user.username === 'string' &&
-      user.username.trim() !== ''
-    );
-    
-    if (validUsers.length === 0) {
-      throw new Error('No valid user data found - username is required');
-    }
-    
-    // Cache the users (convert profile to avatar for compatibility)
-    const usersToCache = validUsers.map(user => ({
-      username: user.username,
-      name: user.name || user.username,
-      avatar: user.profile || user.avatar || ''
-    }));
-    
-    const success = await window.GitHubMentionsStorage.setCachedUsers(usersToCache);
-    if (success) {
-      showSuccess(`Successfully loaded ${validUsers.length} users from table`);
-      updateStatus();
-    } else {
-      showError('Failed to cache user data - storage error');
-    }
-    
-  } catch (error) {
-    console.error('Load GUI users error:', error);
-    showError(`Failed to load users: ${error.message}`);
-  } finally {
-    loadGuiUsersBtn.disabled = false;
-    loadGuiUsersBtn.textContent = 'Load Users';
-  }
-}
-
-/**
- * Refresh user list from endpoint
- */
-async function refreshUsers() {
-  const url = endpointUrlInput.value.trim();
-  if (!url) {
-    showError('Please enter an endpoint URL');
-    return;
-  }
-
-  refreshUsersBtn.disabled = true;
-  refreshUsersBtn.textContent = 'Refreshing...';
-
-  try {
-    console.log('Refreshing users from endpoint:', url);
-    
-    // Fetch and cache users directly
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      mode: 'cors' // Enable CORS
-    });
-    
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-    
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'No error details available');
-      console.error('HTTP Error Response:', errorText);
-      throw new Error(`HTTP ${response.status}: ${response.statusText}. Response: ${errorText}`);
-    }
-    
-    const data = await response.json();
-    console.log('Response data:', data);
-    
-    if (Array.isArray(data) && data.length > 0) {
-      const success = await window.GitHubMentionsStorage.setCachedUsers(data);
-      if (success) {
-        showSuccess(`Successfully cached ${data.length} users`);
-        updateStatus();
-      } else {
-        showError('Failed to cache user data - storage error');
-      }
-    } else if (Array.isArray(data)) {
-      showError('Endpoint returned an empty array - no users to cache');
-    } else {
-      showError('Endpoint returned invalid data format - expected JSON array');
-    }
-  } catch (error) {
-    console.error('Refresh users error:', error);
-    
-    // Provide more specific error messages
-    let errorMessage = 'Failed to refresh users: ';
-    
-    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-      errorMessage += 'Network error - check if the URL is accessible and CORS is enabled';
-    } else if (error.name === 'SyntaxError') {
-      errorMessage += 'Invalid JSON response from endpoint';
-    } else if (error.message.includes('CORS')) {
-      errorMessage += 'CORS error - the endpoint must allow cross-origin requests';
-    } else {
-      errorMessage += error.message;
-    }
-    
-    showError(errorMessage);
-  } finally {
-    refreshUsersBtn.disabled = false;
-    refreshUsersBtn.textContent = 'Refresh List';
-  }
-}
-
-/**
  * Update status display
  */
 async function updateStatus() {
@@ -511,19 +275,13 @@ async function updateStatus() {
       extensionStatus.className = 'status-value success';
       
       // Update data source status
-      const dataSource = settings.dataSource || 'endpoint';
-      dataSourceStatus.textContent = dataSource === 'endpoint' ? 'HTTP Endpoint' : 'Direct JSON';
+      const dataSource = settings.dataSource || 'gui';
+      dataSourceStatus.textContent = dataSource === 'direct' ? 'Direct JSON' : 'Local (GUI)';
       dataSourceStatus.className = 'status-value success';
       
       // Update cache status
       const cachedUsers = await window.GitHubMentionsStorage.getCachedUsers();
-      if (cachedUsers && cachedUsers.length > 0) {
-        cachedUsersCount.textContent = cachedUsers.length.toString();
-        cacheStatus.textContent = 'Cached';
-      } else {
-        cachedUsersCount.textContent = '0';
-        cacheStatus.textContent = 'No cache';
-      }
+      cachedUsersCount.textContent = cachedUsers.length.toString()
     } else {
       extensionStatus.textContent = 'Inactive';
       extensionStatus.className = 'status-value error';
@@ -537,13 +295,27 @@ async function updateStatus() {
  * Show success message
  */
 function showSuccess(message) {
-  endpointStatus.className = 'status-indicator success';
-  endpointStatus.querySelector('.status-text').textContent = message;
-  endpointStatus.classList.remove('hidden');
+  const container = document.getElementById('statusIndicatorContainer');
+  if (!container) return;
+  
+  // Remove existing status indicator if any
+  const existing = container.querySelector('.status-indicator');
+  if (existing) {
+    existing.remove();
+  }
+  
+  // Create new status indicator
+  const statusIndicator = document.createElement('div');
+  statusIndicator.className = 'status-indicator success';
+  statusIndicator.innerHTML = '<div class="status-icon"></div><span class="status-text"></span>';
+  statusIndicator.querySelector('.status-text').textContent = message;
+  container.appendChild(statusIndicator);
   
   // Hide after 3 seconds
   setTimeout(() => {
-    endpointStatus.classList.add('hidden');
+    if (statusIndicator.parentNode) {
+      statusIndicator.remove();
+    }
   }, 3000);
 }
 
@@ -551,23 +323,28 @@ function showSuccess(message) {
  * Show error message
  */
 function showError(message) {
-  endpointStatus.className = 'status-indicator error';
-  endpointStatus.querySelector('.status-text').textContent = message;
-  endpointStatus.classList.remove('hidden');
+  const container = document.getElementById('statusIndicatorContainer');
+  if (!container) return;
+  
+  // Remove existing status indicator if any
+  const existing = container.querySelector('.status-indicator');
+  if (existing) {
+    existing.remove();
+  }
+  
+  // Create new status indicator
+  const statusIndicator = document.createElement('div');
+  statusIndicator.className = 'status-indicator error';
+  statusIndicator.innerHTML = '<div class="status-icon"></div><span class="status-text"></span>';
+  statusIndicator.querySelector('.status-text').textContent = message;
+  container.appendChild(statusIndicator);
   
   // Hide after 5 seconds
   setTimeout(() => {
-    endpointStatus.classList.add('hidden');
+    if (statusIndicator.parentNode) {
+      statusIndicator.remove();
+    }
   }, 5000);
-}
-
-/**
- * Show loading message
- */
-function showLoading(message) {
-  endpointStatus.className = 'status-indicator loading';
-  endpointStatus.querySelector('.status-text').textContent = message;
-  endpointStatus.classList.remove('hidden');
 }
 
 /**
@@ -580,27 +357,11 @@ function setupEventListeners() {
   });
   
   // Save settings button
-  saveSettingsBtn.addEventListener('click', saveSettings);
-  
-  // Test endpoint button
-  testEndpointBtn.addEventListener('click', testEndpoint);
-  
-  // Refresh users button
-  refreshUsersBtn.addEventListener('click', refreshUsers);
+  saveSettingsBtn.addEventListener('click', saveSettingsAndRefresh);
   
   // Validate JSON button
   if (validateJsonBtn) {
     validateJsonBtn.addEventListener('click', validateJson);
-  }
-  
-  // Load direct users button
-  if (loadDirectUsersBtn) {
-    loadDirectUsersBtn.addEventListener('click', loadDirectUsers);
-  }
-  
-  // Load GUI users button
-  if (loadGuiUsersBtn) {
-    loadGuiUsersBtn.addEventListener('click', loadGuiUsers);
   }
   
   // Add user row button
@@ -669,15 +430,9 @@ function setupEventListeners() {
   });
   
   // Enter key on inputs
-  endpointUrlInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      saveSettings();
-    }
-  });
-  
   directJsonData.addEventListener('keypress', (e) => {
     if (e.ctrlKey && e.key === 'Enter') {
-      loadDirectUsers();
+      saveSettings();
     }
   });
 }
@@ -805,8 +560,7 @@ function createNewCommand() {
   // Ensure currentSettings exists
   if (!currentSettings) {
     currentSettings = {
-      dataSource: 'endpoint',
-      endpointUrl: '',
+      dataSource: 'gui',
       directJsonData: '',
       enabled: true,
       customCommands: {}
@@ -1099,7 +853,7 @@ async function saveSettingsAndRefresh() {
     const tabs = await chrome.tabs.query({url: '*://*.github.com/*'});
     for (const tab of tabs) {
       chrome.tabs.sendMessage(tab.id, {
-        type: 'SETTINGS_UPDATED',
+        type: 'GMP_SETTINGS_UPDATED',
         settings: currentSettings
       });
     }

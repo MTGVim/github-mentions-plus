@@ -30,11 +30,6 @@ async function initialize() {
     
     // Load cached users if available
     cachedUsers = await window.GitHubMentionsStorage.getCachedUsers();
-    
-    // If we have an endpoint and no cached users, try to load from endpoint
-    if (settings?.endpointUrl && cachedUsers.length === 0) {
-      await loadUsersFromEndpoint();
-    }
 
     // Start scanning for inputs
     scanInputs();
@@ -47,38 +42,7 @@ async function initialize() {
 }
 
 /**
- * Load users from endpoint and cache them
- * @returns {Promise<boolean>} Success status
- */
-async function loadUsersFromEndpoint() {
-  if (!settings?.endpointUrl) {
-    return false;
-  }
-
-  try {
-    // Check if API utilities are available
-    if (!window.GitHubMentionsAPI) {
-      return false;
-    }
-    
-    // Fetch users from endpoint
-    const users = await window.GitHubMentionsAPI.fetchUsersFromEndpoint(settings.endpointUrl);
-    
-    // Enhance with GitHub avatars for users without avatars
-    const enhancedUsers = await window.GitHubMentionsAPI.enhanceUsersWithAvatars(users);
-    
-    // Cache the enhanced users
-    await window.GitHubMentionsStorage.setCachedUsers(enhancedUsers);
-    cachedUsers = enhancedUsers;
-    
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-/**
- * Get users for suggestions (from cache, endpoint, or direct JSON)
+ * Get users for suggestions (from cache or direct JSON/GUI)
  * @returns {Promise<Array>} Array of user data
  */
 async function getUsersForSuggestions() {
@@ -98,8 +62,8 @@ async function getUsersForSuggestions() {
     return [];
   }
   
-  // Handle direct JSON data source
-  if (currentSettings.dataSource === 'direct' && currentSettings.directJsonData) {
+  // Handle direct JSON data source (both 'direct' and 'gui' use directJsonData)
+  if ((currentSettings.dataSource === 'direct' || currentSettings.dataSource === 'gui') && currentSettings.directJsonData) {
     try {
       const directUsers = JSON.parse(currentSettings.directJsonData);
       if (Array.isArray(directUsers) && directUsers.length > 0) {
@@ -107,9 +71,13 @@ async function getUsersForSuggestions() {
         const validUsers = directUsers.filter(user => 
           user && typeof user === 'object' &&
           typeof user.username === 'string' &&
-          typeof user.name === 'string' &&
+          (typeof user.name === 'string' || user.name === undefined) &&
           (user.avatar === undefined || typeof user.avatar === 'string')
-        );
+        ).map(user => ({
+          username: user.username,
+          name: user.name || user.username,
+          avatar: user.avatar || user.profile || ''
+        }));
         
         if (validUsers.length > 0) {
           // Cache the valid users
@@ -120,15 +88,6 @@ async function getUsersForSuggestions() {
       }
     } catch (error) {
       console.error('Failed to parse direct JSON data:', error);
-    }
-  }
-  
-  // Handle HTTP endpoint data source
-  if (currentSettings.dataSource === 'endpoint' && currentSettings.endpointUrl) {
-    // If cache is expired and we have an endpoint, try to load fresh data
-    if (await window.GitHubMentionsStorage.isCacheExpired()) {
-      await loadUsersFromEndpoint();
-      return cachedUsers;
     }
   }
   
@@ -612,12 +571,59 @@ async function handleMessage(message, sender, sendResponse) {
     }
     
     switch (message.action || message.type) {
-      case 'SETTINGS_UPDATED':
+      case 'GMP_SETTINGS_UPDATED':
         // Handle settings update from popup
         settings = message.settings;
         
-        // Reload cached users if needed
-        cachedUsers = await window.GitHubMentionsStorage.getCachedUsers();
+        // Reload cached users immediately from the updated settings
+        if (settings?.directJsonData && settings.directJsonData !== '[]') {
+          try {
+            const directUsers = JSON.parse(settings.directJsonData);
+            if (Array.isArray(directUsers) && directUsers.length > 0) {
+              const validUsers = directUsers.filter(user => 
+                user && typeof user === 'object' &&
+                typeof user.username === 'string' &&
+                user.username.trim() !== ''
+              ).map(user => ({
+                username: user.username,
+                name: user.name || user.username,
+                avatar: user.avatar || user.profile || ''
+              }));
+              
+              if (validUsers.length > 0) {
+                // Try to update cache, but don't fail if storage access is not available
+                try {
+                  if (window.GitHubMentionsStorage && typeof window.GitHubMentionsStorage.setCachedUsers === 'function') {
+                    await window.GitHubMentionsStorage.setCachedUsers(validUsers);
+                  }
+                } catch (storageError) {
+                  console.warn('Failed to update cache in content script, using in-memory cache only:', storageError);
+                }
+                cachedUsers = validUsers;
+              } else {
+                cachedUsers = [];
+              }
+            } else {
+              cachedUsers = [];
+            }
+          } catch (error) {
+            console.error('Failed to parse direct JSON data on settings update:', error);
+            // Fallback to loading from cache
+            try {
+              if (window.GitHubMentionsStorage && typeof window.GitHubMentionsStorage.getCachedUsers === 'function') {
+                cachedUsers = await window.GitHubMentionsStorage.getCachedUsers();
+              } else {
+                cachedUsers = [];
+              }
+            } catch (storageError) {
+              console.warn('Failed to load from cache:', storageError);
+              cachedUsers = [];
+            }
+          }
+        } else {
+          // No data, clear cache
+          cachedUsers = [];
+        }
         
         // Force refresh any active command dropdown
         if (activeInput) {
@@ -648,69 +654,50 @@ async function handleMessage(message, sender, sendResponse) {
         // No need to sendResponse for fire-and-forget messages
         return;
         
-      case 'testEndpoint':
-        const testResult = await window.GitHubMentionsAPI.testEndpoint(message.endpointUrl);
-        sendResponse(testResult);
-        break;
-        
       case 'refreshUsers':
         // Get current settings to determine data source
         const currentSettings = await window.GitHubMentionsStorage.getSettings();
         
-        if (currentSettings?.dataSource === 'direct' && currentSettings?.directJsonData) {
-          // Handle direct JSON refresh
+        if ((currentSettings?.dataSource === 'direct' || currentSettings?.dataSource === 'gui') && currentSettings?.directJsonData) {
+          // Handle direct JSON refresh (both 'direct' and 'gui' use directJsonData)
           try {
             const directUsers = JSON.parse(currentSettings.directJsonData);
             if (Array.isArray(directUsers) && directUsers.length > 0) {
               const validUsers = directUsers.filter(user => 
                 user && typeof user === 'object' &&
                 typeof user.username === 'string' &&
-                typeof user.name === 'string' &&
+                (typeof user.name === 'string' || user.name === undefined) &&
                 (user.avatar === undefined || typeof user.avatar === 'string')
-              );
+              ).map(user => ({
+                username: user.username,
+                name: user.name || user.username,
+                avatar: user.avatar || user.profile || ''
+              }));
               
               if (validUsers.length > 0) {
                 await window.GitHubMentionsStorage.setCachedUsers(validUsers);
                 cachedUsers = validUsers;
                 sendResponse({
                   success: true,
-                  message: `Successfully loaded ${validUsers.length} users from direct JSON`,
+                  message: `Successfully loaded ${validUsers.length} users from ${currentSettings.dataSource === 'gui' ? 'GUI table' : 'direct JSON'}`,
                   userCount: validUsers.length
                 });
               } else {
                 sendResponse({
                   success: false,
-                  message: 'No valid user data found in direct JSON'
+                  message: 'No valid user data found'
                 });
               }
             } else {
               sendResponse({
                 success: false,
-                message: 'Direct JSON data is invalid or empty'
+                message: 'Data is invalid or empty'
               });
             }
           } catch (error) {
             sendResponse({
               success: false,
-              message: `Failed to parse direct JSON: ${error.message}`
-            });
-          }
-        } else if (currentSettings?.dataSource === 'endpoint' && currentSettings?.endpointUrl) {
-          // Handle endpoint refresh (existing logic)
-          settings = { ...settings, endpointUrl: currentSettings.endpointUrl };
-          await window.GitHubMentionsStorage.setSettings(settings);
-          
-          const success = await loadUsersFromEndpoint();
-          if (success) {
-            sendResponse({
-              success: true,
-              message: `Successfully loaded ${cachedUsers.length} users`,
-              userCount: cachedUsers.length
-            });
-          } else {
-            sendResponse({
-              success: false,
-              message: 'Failed to load users from endpoint'
+              message: `Failed to parse data: ${error.message}`
             });
           }
         } else {
@@ -836,7 +823,6 @@ window.addEventListener('pagehide', () => {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     initialize,
-    loadUsersFromEndpoint,
     insertMention,
     scanForTrigger,
     filterUsers

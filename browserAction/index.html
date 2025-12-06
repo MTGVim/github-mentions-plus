@@ -15,49 +15,17 @@
 
       <main>
         <section class="settings-section">
-          <h2>Data Source Configuration</h2>
-          
           <div class="form-group">
             <label>Data Source</label>
             <div class="radio-group">
               <label class="radio-option">
                 <input type="radio" name="dataSource" value="gui" checked/>
-                <span class="radio-label">Local</span>
+                <span class="radio-label">Local(GUI)</span>
               </label>
               <label class="radio-option">
                 <input type="radio" name="dataSource" value="direct" />
                 <span class="radio-label">Local(JSON)</span>
               </label>
-              <label class="radio-option">
-                <input type="radio" name="dataSource" value="endpoint" />
-                <span class="radio-label">HTTP Endpoint</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- Endpoint Configuration -->
-          <div id="endpointSection" class="data-source-section">
-            <h3>Endpoint Configuration</h3>
-            <div class="form-group">
-              <label for="endpointUrl">Endpoint URL</label>
-              <input 
-                type="url" 
-                id="endpointUrl" 
-                placeholder="https://your-endpoint.com/users.json"
-                class="form-control"
-              />
-              <small class="help-text">
-                Your endpoint must return a JSON array of user objects with <code>username</code>, <code>name</code> and <code>avatar</code> fields.
-              </small>
-            </div>
-
-            <div class="form-group">
-              <button id="testEndpoint" class="btn btn-secondary">
-                Test Endpoint
-              </button>
-              <button id="refreshUsers" class="btn btn-primary">
-                Refresh User List
-              </button>
             </div>
           </div>
 
@@ -90,9 +58,6 @@
             <div class="form-group">
               <button id="validateJson" class="btn btn-secondary">
                 Validate JSON
-              </button>
-              <button id="loadDirectUsers" class="btn btn-primary">
-                Load Users
               </button>
             </div>
           </div>
@@ -128,14 +93,7 @@
               <button id="addUserRow" class="btn btn-secondary">
                 + Add Row
               </button>
-              <button id="loadGuiUsers" class="btn btn-primary">
-                Load Users
-              </button>
             </div>
-          </div>
-          <div id="endpointStatus" class="status-indicator hidden">
-            <div class="status-icon"></div>
-            <span class="status-text"></span>
           </div>
         </section>
 
@@ -200,15 +158,11 @@
               <span class="status-label">Cached Users:</span>
               <span id="cachedUsersCount" class="status-value">Loading...</span>
             </div>
-            
-            <div class="status-item">
-              <span class="status-label">Cache Status:</span>
-              <span id="cacheStatus" class="status-value">Loading...</span>
-            </div>
           </div>
         </section>
       </main>
 
+      <div id="statusIndicatorContainer" class="status-indicator-container"></div>
       <footer>
         <button id="saveSettings" class="btn btn-primary btn-full">
           Save Settings
