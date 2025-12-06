@@ -17,7 +17,7 @@ GitHub's native @mention autocomplete only suggests users that the current user 
 
 ## Solution
 
-GitHub Mentions+ augments GitHub's native @@mention autocomplete by:
+GitHub Mentions+ augments GitHub's native @mention autocomplete by:
 
 1. **Listening** for @@ mentions in GitHub textareas and contenteditable elements
 2. **Fetching** custom user suggestions from a user-configurable endpoint OR direct JSON input
