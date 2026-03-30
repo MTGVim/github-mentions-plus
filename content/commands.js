@@ -85,7 +85,7 @@ async function executeCommand(command, input, settings) {
     const text = input.value;
     const beforeCursor = text.substring(0, cursor);
     const afterCursor = text.substring(cursor);
-    const commandMatch = beforeCursor.match(/!([a-zA-Z0-9-_]*)$/);
+    const commandMatch = beforeCursor.match(/@!([a-zA-Z0-9-_]*)$/);
 
     if (!commandMatch) {
       return false;
@@ -111,6 +111,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     getBuiltInCommands,
     buildAvailableCommands,
-    applyCommandTemplate
+    applyCommandTemplate,
+    executeCommand
   };
 }

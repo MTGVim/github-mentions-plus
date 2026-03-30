@@ -20,6 +20,21 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
     };
   }
 
+  function isSupportedInput(input) {
+    return Boolean(
+      input &&
+      (input.matches?.('textarea') || input.matches?.('[contenteditable="true"]'))
+    );
+  }
+
+  function resetStaleActiveInput() {
+    if (state.activeInput && state.activeInput.isConnected === false) {
+      state.activeInput = null;
+      state.mentionStartPos = null;
+      getApi().dom.hideOverlay();
+    }
+  }
+
   function insertMention(username) {
     if (!state.activeInput) {
       return;
@@ -44,6 +59,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
 
   async function refreshOverlayForActiveInput() {
     const { dom, triggers, commands, usersSource, storage } = getApi();
+    resetStaleActiveInput();
     if (!state.activeInput || !state.settings?.enabled) {
       return;
     }
@@ -91,6 +107,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
 
   async function onKeyUp(event) {
     const { dom } = getApi();
+    resetStaleActiveInput();
     if (!state.activeInput || !state.settings?.enabled) {
       return;
     }
@@ -128,6 +145,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
 
   function onInput() {
     const { dom, triggers } = getApi();
+    resetStaleActiveInput();
     if (!state.activeInput || !state.settings?.enabled) {
       return;
     }
@@ -147,6 +165,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
 
   function handleKeyDown(event) {
     const { dom } = getApi();
+    resetStaleActiveInput();
     if (!state.settings?.enabled || !state.activeInput) {
       return;
     }
@@ -169,6 +188,10 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
 
   function activateInput(input) {
     try {
+      if (!isSupportedInput(input)) {
+        return;
+      }
+
       state.activeInput = input;
       input.dataset.mentionEnhanced = 'true';
 
@@ -190,6 +213,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
 
   function scanInputs() {
     try {
+      resetStaleActiveInput();
       const inputs = document.querySelectorAll('textarea, [contenteditable="true"]');
       const focusedInput = document.activeElement;
 
@@ -203,6 +227,15 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
     } catch (error) {
       // ignore scanning failures
     }
+  }
+
+  function handleFocusIn(event) {
+    const nextInput = event.target;
+    if (!isSupportedInput(nextInput)) {
+      return;
+    }
+
+    activateInput(nextInput);
   }
 
   function handleVisibilityChange() {
@@ -312,6 +345,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
 
   return {
     cleanup,
+    handleFocusIn,
     handleMessage,
     handleResize,
     handleVisibilityChange,

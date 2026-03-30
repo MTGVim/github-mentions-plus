@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 
 const {
   buildAvailableCommands,
-  applyCommandTemplate
+  applyCommandTemplate,
+  executeCommand
 } = require('../content/commands.js');
 
 const { handleKeyNavigation } = require('../utils/overlay/navigation.js');
@@ -30,6 +31,26 @@ test('applyCommandTemplate replaces supported variables', () => {
 
   assert.ok(rendered.includes('2026-03-30T12:34:56.000Z'));
   assert.ok(rendered.length > '${timestamp} ${date} ${time}'.length);
+});
+
+test('executeCommand replaces the full @! trigger including the at sign', async () => {
+  const input = {
+    value: 'Please check @!review',
+    selectionStart: 'Please check @!review'.length,
+    selectionEnd: 'Please check @!review'.length,
+    dispatchEvent() {}
+  };
+
+  const success = await executeCommand('review', input, {
+    customCommands: {
+      review: {
+        content: 'approved'
+      }
+    }
+  });
+
+  assert.equal(success, true);
+  assert.equal(input.value, 'Please check approved');
 });
 
 function createNavigationEnvironment(items) {
