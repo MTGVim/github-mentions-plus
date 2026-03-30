@@ -14,7 +14,7 @@ function scanForMentionTrigger(text, pos) {
 function scanForCommandTrigger(text, pos) {
   try {
     const slice = text.substring(0, pos);
-    const match = slice.match(/!([a-zA-Z0-9-_]*)$/);
+    const match = slice.match(/@!([a-zA-Z0-9-_]*)$/);
     return match ? { command: match[1], query: match[1] } : null;
   } catch (error) {
     return null;

@@ -55,18 +55,7 @@ function handleKeyNavigation(event) {
       if (!item) {
         return false;
       }
-
-      if (!item.isCommand) {
-        return createNavigationAction('select', item);
-      }
-
-      const isConfirmShortcut = overlayNavigationRoot.GitHubMentionsContent?.isCommandConfirmShortcut
-        ? overlayNavigationRoot.GitHubMentionsContent.isCommandConfirmShortcut(event, navigator)
-        : false;
-
-      return isConfirmShortcut
-        ? createNavigationAction('select', item)
-        : createNavigationAction('blocked-command-select', item);
+      return createNavigationAction('select', item);
     }
 
     case 'Escape':

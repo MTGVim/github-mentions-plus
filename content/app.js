@@ -165,10 +165,6 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
       dom.hideOverlay();
       return;
     }
-
-    if (action.type === 'blocked-command-select') {
-      return;
-    }
   }
 
   function activateInput(input) {

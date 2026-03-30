@@ -14,8 +14,8 @@ test('scanForMentionTrigger returns query after double-at', () => {
 });
 
 test('scanForCommandTrigger returns command info after bang', () => {
-  assert.deepEqual(scanForCommandTrigger('run !lgt', 8), { command: 'lgt', query: 'lgt' });
-  assert.equal(scanForCommandTrigger('run /lgt', 8), null);
+  assert.deepEqual(scanForCommandTrigger('run @!lgt', 9), { command: 'lgt', query: 'lgt' });
+  assert.equal(scanForCommandTrigger('run !lgt', 8), null);
 });
 
 test('filter helpers match usernames and commands case-insensitively', () => {
