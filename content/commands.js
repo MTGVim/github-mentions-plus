@@ -87,10 +87,10 @@ async function executeCommand(command, input, settings) {
         if (lgtmResult && lgtmResult.success && lgtmResult.imageUrl) {
           result = `![LGTM](${lgtmResult.imageUrl})`;
         } else {
-          result = '![LGTM](https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif)';
+          return false;
         }
       } catch (error) {
-        result = '![LGTM](https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif)';
+        return false;
       }
     } else {
       const customCommands = settings?.customCommands || {};
