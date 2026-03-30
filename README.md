@@ -53,6 +53,19 @@ bash scripts/build-release-zip.sh
 
 This creates `release/github-mentions-plus-v<version>.zip` using the version in `manifest.json`.
 
+Cut a release version, create the matching tag, and push both with:
+
+```bash
+yarn release:version 1.1.0
+```
+
+This will:
+- update `manifest.json`
+- commit the version bump
+- create tag `v1.1.0`
+- push `main`
+- push the tag so the release workflow runs
+
 Release notes and store submission steps are in [docs/release-checklist.md](/home/tigeryoo/workspace/github-mentions-plus/docs/release-checklist.md).
 
 ### GitHub Actions Release Flow

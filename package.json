@@ -1,0 +1,8 @@
+{
+  "name": "github-mentions-plus",
+  "private": true,
+  "scripts": {
+    "release:zip": "bash scripts/build-release-zip.sh",
+    "release:version": "bash scripts/release-version.sh"
+  }
+}

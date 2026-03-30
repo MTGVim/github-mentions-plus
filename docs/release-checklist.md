@@ -9,11 +9,13 @@
 
 ## GitHub Release Automation
 
-1. Commit the version bump.
-2. Create a matching tag, for example `git tag v1.1.0`.
-3. Push the branch and tag:
-   - `git push origin main`
-   - `git push origin v1.1.0`
+1. Run `yarn release:version 1.1.0`.
+2. The script will:
+   - update `manifest.json`
+   - commit the version bump
+   - create tag `v1.1.0`
+   - push `main`
+   - push `v1.1.0`
 4. The `Release Extension` workflow will:
    - validate that `manifest.json` version matches the tag
    - build `release/github-mentions-plus-v<version>.zip`
