@@ -19,6 +19,13 @@ const addCommandBtn = document.getElementById('addCommand');
 const commandCountDisplay = document.getElementById('commandCount');
 const userTableBody = document.getElementById('userTableBody');
 const addUserRowBtn = document.getElementById('addUserRow');
+const interactionRulesStatus = document.getElementById('interactionRulesStatus');
+const interactionDefaultsCard = document.getElementById('interactionDefaultsCard');
+const interactionRulesList = document.getElementById('interactionRulesList');
+const addInteractionRuleBtn = document.getElementById('addInteractionRule');
+const exportSettingsBtn = document.getElementById('exportSettings');
+const importSettingsBtn = document.getElementById('importSettings');
+const importSettingsFileInput = document.getElementById('importSettingsFile');
 
 // Modal elements
 const commandModal = document.getElementById('commandModal');
@@ -33,9 +40,18 @@ const emojiPickerBtn = document.getElementById('emojiPickerBtn');
 const emojiPicker = document.getElementById('emojiPicker');
 const emojiGrid = document.getElementById('emojiGrid');
 const clearEmojiBtn = document.getElementById('clearEmoji');
+const interactionRuleModal = document.getElementById('interactionRuleModal');
+const interactionRuleModalTitle = document.getElementById('interactionRuleModalTitle');
+const interactionRuleModalClose = document.getElementById('interactionRuleModalClose');
+const interactionRuleModalCancel = document.getElementById('interactionRuleModalCancel');
+const interactionRuleModalSave = document.getElementById('interactionRuleModalSave');
+const interactionRulePathPrefixInput = document.getElementById('interactionRulePathPrefix');
+const interactionRuleEnterEnabledInput = document.getElementById('interactionRuleEnterEnabled');
+const interactionRuleClickEnabledInput = document.getElementById('interactionRuleClickEnabled');
 
 // Modal state
 let editingCommand = null;
+let editingInteractionRuleId = null;
 
 // Emoji data
 const emojiData = {
@@ -47,6 +63,17 @@ const emojiData = {
 
 // State
 let currentSettings = null;
+let interactionConfig = null;
+let interactionContextAvailable = false;
+let interactionCurrentPath = '/';
+const DEFAULT_INTERACTION_CONFIG = {
+  version: 1,
+  defaultModes: {
+    enterEnabled: true,
+    clickEnabled: true
+  },
+  rules: []
+};
 
 /**
  * Initialize the popup
@@ -58,6 +85,9 @@ async function initialize() {
     
     // Update status display
     await updateStatus();
+
+    // Load interaction rules from active GitHub tab localStorage
+    await loadInteractionConfig();
     
     // Add event listeners
     setupEventListeners();
@@ -67,6 +97,7 @@ async function initialize() {
     
     // Load and display commands
     updateCommandsGrid();
+    renderInteractionRules();
     
     // Load user table data if GUI tab is selected
     const selectedDataSource = document.querySelector('input[name="dataSource"]:checked')?.value;
@@ -91,6 +122,234 @@ async function loadSettings() {
   } catch (error) {
     // Silently handle loading errors
   }
+}
+
+function createDefaultInteractionConfig() {
+  return JSON.parse(JSON.stringify(DEFAULT_INTERACTION_CONFIG));
+}
+
+function normalizePathPrefix(pathPrefix) {
+  if (typeof pathPrefix !== 'string') {
+    return '/';
+  }
+
+  const trimmed = pathPrefix.trim();
+  if (!trimmed || trimmed === '/') {
+    return '/';
+  }
+
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return withLeadingSlash.replace(/\/+$/, '') || '/';
+}
+
+function sanitizeInteractionRule(rule) {
+  if (!rule || typeof rule !== 'object') {
+    return null;
+  }
+
+  const pathPrefix = normalizePathPrefix(rule.pathPrefix);
+  return {
+    id: typeof rule.id === 'string' && rule.id.trim() ? rule.id : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    pathPrefix,
+    enterEnabled: rule.enterEnabled !== false,
+    clickEnabled: rule.clickEnabled !== false,
+    updatedAt: typeof rule.updatedAt === 'number' ? rule.updatedAt : Date.now()
+  };
+}
+
+function sanitizeInteractionConfig(config) {
+  const source = config && typeof config === 'object' ? config : {};
+  return {
+    version: 1,
+    defaultModes: {
+      enterEnabled: source.defaultModes?.enterEnabled !== false,
+      clickEnabled: source.defaultModes?.clickEnabled !== false
+    },
+    rules: Array.isArray(source.rules)
+      ? source.rules.map(sanitizeInteractionRule).filter(Boolean)
+      : []
+  };
+}
+
+function sanitizeSettingsPayload(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  return {
+    dataSource: source.dataSource === 'direct' ? 'direct' : 'gui',
+    directJsonData: typeof source.directJsonData === 'string' ? source.directJsonData : '[]',
+    enabled: source.enabled !== false,
+    customCommands: source.customCommands && typeof source.customCommands === 'object' ? source.customCommands : {}
+  };
+}
+
+async function getActiveGitHubTab() {
+  const tabs = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+    url: '*://*.github.com/*'
+  });
+
+  return tabs[0] || null;
+}
+
+async function sendMessageToActiveGitHubTab(message) {
+  const tab = await getActiveGitHubTab();
+  if (!tab?.id) {
+    throw new Error('Open a GitHub tab to manage path rules.');
+  }
+
+  return chrome.tabs.sendMessage(tab.id, message);
+}
+
+async function loadInteractionConfig() {
+  try {
+    const response = await sendMessageToActiveGitHubTab({ type: 'GMP_GET_INTERACTION_CONFIG' });
+    if (!response?.success) {
+      throw new Error(response?.message || 'Failed to load interaction rules');
+    }
+
+    interactionConfig = sanitizeInteractionConfig(response.config);
+    interactionContextAvailable = true;
+    interactionCurrentPath = response.currentPath || '/';
+    setInteractionStatus(`Using localStorage from active GitHub tab. Current path: ${interactionCurrentPath}`, 'success');
+  } catch (error) {
+    interactionConfig = createDefaultInteractionConfig();
+    interactionContextAvailable = false;
+    interactionCurrentPath = '/';
+    setInteractionStatus(error.message, 'error');
+  }
+}
+
+async function saveInteractionConfig() {
+  const configToSave = sanitizeInteractionConfig(interactionConfig);
+  const response = await sendMessageToActiveGitHubTab({
+    type: 'GMP_SET_INTERACTION_CONFIG',
+    config: configToSave
+  });
+
+  if (!response?.success) {
+    throw new Error(response?.message || 'Failed to save interaction rules');
+  }
+
+  interactionConfig = sanitizeInteractionConfig(response.config);
+  interactionContextAvailable = true;
+  setInteractionStatus('Interaction rules saved to localStorage.', 'success');
+
+  try {
+    const tabs = await chrome.tabs.query({ url: '*://*.github.com/*' });
+    for (const tab of tabs) {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, { type: 'GMP_SETTINGS_UPDATED', settings: currentSettings });
+      }
+    }
+  } catch (error) {
+    // Ignore refresh broadcast failures
+  }
+}
+
+function createExportPayload() {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    app: 'github-mentions-plus',
+    settings: sanitizeSettingsPayload(currentSettings),
+    interactionConfig: sanitizeInteractionConfig(interactionConfig)
+  };
+}
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+async function exportUserSettings() {
+  try {
+    if (document.querySelector('input[name="dataSource"]:checked')?.value === 'gui') {
+      syncTableToJson();
+    }
+
+    const settingsSnapshot = {
+      ...(currentSettings || {}),
+      dataSource: document.querySelector('input[name="dataSource"]:checked')?.value || currentSettings?.dataSource || 'gui',
+      directJsonData: directJsonData.value.trim() || '[]'
+    };
+    currentSettings = sanitizeSettingsPayload(settingsSnapshot);
+
+    if (interactionContextAvailable) {
+      await loadInteractionConfig();
+    }
+
+    const payload = createExportPayload();
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadTextFile(`github-mentions-plus-settings-${timestamp}.json`, JSON.stringify(payload, null, 2));
+    showSuccess('Settings exported.');
+  } catch (error) {
+    showError(error.message || 'Failed to export settings.');
+  }
+}
+
+async function importUserSettingsFromFile(file) {
+  if (!file) {
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Invalid import file.');
+    }
+
+    const nextSettings = sanitizeSettingsPayload(payload.settings);
+    const nextInteractionConfig = sanitizeInteractionConfig(payload.interactionConfig);
+
+    const saved = await window.GitHubMentionsStorage.setSettings(nextSettings);
+    if (!saved) {
+      throw new Error('Failed to save extension settings.');
+    }
+
+    currentSettings = nextSettings;
+    updateSettingUI();
+    userTableBody.innerHTML = '';
+    if (currentSettings.dataSource === 'gui') {
+      loadUserTableData();
+    }
+    updateCommandsGrid();
+
+    let importMessage = 'Settings imported.';
+    if (interactionContextAvailable) {
+      interactionConfig = nextInteractionConfig;
+      await saveInteractionConfig();
+      renderInteractionRules();
+    } else {
+      interactionConfig = nextInteractionConfig;
+      renderInteractionRules();
+      importMessage = 'Extension settings imported. Open a GitHub tab to apply interaction rules to localStorage.';
+    }
+
+    await updateStatus();
+    await saveSettingsAndRefresh();
+    showSuccess(importMessage);
+  } catch (error) {
+    showError(error.message || 'Failed to import settings.');
+  } finally {
+    if (importSettingsFileInput) {
+      importSettingsFileInput.value = '';
+    }
+  }
+}
+
+function setInteractionStatus(message, status = '') {
+  if (!interactionRulesStatus) return;
+  interactionRulesStatus.textContent = message;
+  interactionRulesStatus.className = `interaction-rules-status${status ? ` ${status}` : ''}`;
 }
 
 /**
@@ -347,6 +606,148 @@ function showError(message) {
   }, 5000);
 }
 
+function renderInteractionRules() {
+  if (!interactionDefaultsCard || !interactionRulesList) {
+    return;
+  }
+
+  interactionDefaultsCard.classList.remove('hidden');
+  const defaults = interactionConfig?.defaultModes || createDefaultInteractionConfig().defaultModes;
+  interactionDefaultsCard.innerHTML = `
+    <div class="interaction-rule-header">
+      <div>
+        <div class="interaction-rule-title">Default Behavior</div>
+        <div class="interaction-rule-path">Applied when no path rule matches. Add a rule for <code>/</code> to override globally.</div>
+      </div>
+    </div>
+    <div class="interaction-rule-meta">
+      <span class="rule-badge ${defaults.enterEnabled ? '' : 'off'}">Enter ${defaults.enterEnabled ? 'On' : 'Off'}</span>
+      <span class="rule-badge ${defaults.clickEnabled ? '' : 'off'}">Click ${defaults.clickEnabled ? 'On' : 'Off'}</span>
+    </div>
+  `;
+
+  interactionRulesList.innerHTML = '';
+
+  if (!interactionContextAvailable) {
+    interactionRulesList.innerHTML = '<div class="interaction-empty-state">Open a GitHub tab to load and edit rules stored in that origin\'s localStorage.</div>';
+    return;
+  }
+
+  const rules = [...(interactionConfig?.rules || [])].sort((a, b) => b.pathPrefix.length - a.pathPrefix.length);
+  if (rules.length === 0) {
+    interactionRulesList.innerHTML = '<div class="interaction-empty-state">No path rules yet. Add one to override the default behavior for a GitHub path prefix.</div>';
+    return;
+  }
+
+  rules.forEach((rule) => {
+    const card = document.createElement('div');
+    card.className = 'interaction-rule-card';
+    card.innerHTML = `
+      <div class="interaction-rule-header">
+        <div>
+          <div class="interaction-rule-title">Path Rule</div>
+          <div class="interaction-rule-path">${escapeHtml(rule.pathPrefix)}</div>
+        </div>
+      </div>
+      <div class="interaction-rule-meta">
+        <span class="rule-badge ${rule.enterEnabled ? '' : 'off'}">Enter ${rule.enterEnabled ? 'On' : 'Off'}</span>
+        <span class="rule-badge ${rule.clickEnabled ? '' : 'off'}">Click ${rule.clickEnabled ? 'On' : 'Off'}</span>
+      </div>
+      <div class="interaction-rule-actions">
+        <button class="btn btn-secondary btn-mini edit-interaction-rule">Edit</button>
+        <button class="btn btn-danger btn-mini delete-interaction-rule">Delete</button>
+      </div>
+    `;
+
+    card.querySelector('.edit-interaction-rule').addEventListener('click', () => openInteractionRuleModal(rule.id));
+    card.querySelector('.delete-interaction-rule').addEventListener('click', () => deleteInteractionRule(rule.id));
+    interactionRulesList.appendChild(card);
+  });
+}
+
+function openInteractionRuleModal(ruleId = null) {
+  if (!interactionContextAvailable) {
+    showError('Open a GitHub tab first. Rules are stored in GitHub localStorage.');
+    return;
+  }
+
+  editingInteractionRuleId = ruleId;
+  const rule = (interactionConfig?.rules || []).find((item) => item.id === ruleId);
+
+  interactionRuleModalTitle.textContent = rule ? 'Edit Interaction Rule' : 'Add Interaction Rule';
+  interactionRulePathPrefixInput.value = rule?.pathPrefix || interactionCurrentPath || '/';
+  interactionRuleEnterEnabledInput.checked = rule ? rule.enterEnabled : true;
+  interactionRuleClickEnabledInput.checked = rule ? rule.clickEnabled : true;
+  interactionRuleModal.classList.remove('hidden');
+  interactionRulePathPrefixInput.focus();
+  interactionRulePathPrefixInput.select();
+}
+
+function closeInteractionRuleModal() {
+  if (!interactionRuleModal) return;
+  interactionRuleModal.classList.add('hidden');
+  editingInteractionRuleId = null;
+  interactionRulePathPrefixInput.value = '';
+  interactionRuleEnterEnabledInput.checked = true;
+  interactionRuleClickEnabledInput.checked = true;
+}
+
+async function saveInteractionRule() {
+  try {
+    const pathPrefix = normalizePathPrefix(interactionRulePathPrefixInput.value);
+    if (!pathPrefix) {
+      showError('Path prefix is required.');
+      interactionRulePathPrefixInput.focus();
+      return;
+    }
+
+    const rules = [...(interactionConfig?.rules || [])];
+    const rule = sanitizeInteractionRule({
+      id: editingInteractionRuleId,
+      pathPrefix,
+      enterEnabled: interactionRuleEnterEnabledInput.checked,
+      clickEnabled: interactionRuleClickEnabledInput.checked,
+      updatedAt: Date.now()
+    });
+
+    const existingIndex = rules.findIndex((item) => item.id === editingInteractionRuleId || item.pathPrefix === rule.pathPrefix);
+    if (existingIndex >= 0) {
+      rules[existingIndex] = rule;
+    } else {
+      rules.push(rule);
+    }
+
+    interactionConfig = sanitizeInteractionConfig({
+      ...(interactionConfig || createDefaultInteractionConfig()),
+      rules
+    });
+
+    await saveInteractionConfig();
+    closeInteractionRuleModal();
+    renderInteractionRules();
+  } catch (error) {
+    showError(error.message || 'Failed to save interaction rule.');
+  }
+}
+
+async function deleteInteractionRule(ruleId) {
+  if (!confirm('Delete this interaction rule?')) {
+    return;
+  }
+
+  try {
+    interactionConfig = sanitizeInteractionConfig({
+      ...(interactionConfig || createDefaultInteractionConfig()),
+      rules: (interactionConfig?.rules || []).filter((rule) => rule.id !== ruleId)
+    });
+
+    await saveInteractionConfig();
+    renderInteractionRules();
+  } catch (error) {
+    showError(error.message || 'Failed to delete interaction rule.');
+  }
+}
+
 /**
  * Setup event listeners
  */
@@ -376,11 +777,42 @@ function setupEventListeners() {
       createNewCommand();
     });
   }
+
+  if (addInteractionRuleBtn) {
+    addInteractionRuleBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openInteractionRuleModal();
+    });
+  }
+
+  if (exportSettingsBtn) {
+    exportSettingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      exportUserSettings();
+    });
+  }
+
+  if (importSettingsBtn) {
+    importSettingsBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      importSettingsFileInput?.click();
+    });
+  }
+
+  if (importSettingsFileInput) {
+    importSettingsFileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      importUserSettingsFromFile(file);
+    });
+  }
   
   // Modal event listeners
   if (modalClose) modalClose.addEventListener('click', closeCommandModal);
   if (modalCancel) modalCancel.addEventListener('click', closeCommandModal);
   if (modalSave) modalSave.addEventListener('click', saveCommand);
+  if (interactionRuleModalClose) interactionRuleModalClose.addEventListener('click', closeInteractionRuleModal);
+  if (interactionRuleModalCancel) interactionRuleModalCancel.addEventListener('click', closeInteractionRuleModal);
+  if (interactionRuleModalSave) interactionRuleModalSave.addEventListener('click', saveInteractionRule);
   
   // Command name validation on input
   if (commandNameInput) {
@@ -421,11 +853,22 @@ function setupEventListeners() {
       }
     });
   }
+
+  if (interactionRuleModal) {
+    interactionRuleModal.addEventListener('click', (e) => {
+      if (e.target === interactionRuleModal) {
+        closeInteractionRuleModal();
+      }
+    });
+  }
   
   // Close modal with Escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !commandModal.classList.contains('hidden')) {
       closeCommandModal();
+    }
+    if (e.key === 'Escape' && interactionRuleModal && !interactionRuleModal.classList.contains('hidden')) {
+      closeInteractionRuleModal();
     }
   });
   

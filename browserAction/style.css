@@ -372,6 +372,27 @@
     font-weight: 500;
     cursor: pointer;
   }
+
+  .checkbox-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .checkbox-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background: #f6f8fa;
+    cursor: pointer;
+  }
+
+  .checkbox-option input {
+    margin: 0;
+  }
   
   /* Data source sections */
   .data-source-section {
@@ -628,6 +649,110 @@
   
   .help-content li {
     margin-bottom: 4px;
+  }
+
+  .interaction-rules-status {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: #f6f8fa;
+    color: #57606a;
+    font-size: 12px;
+    border: 1px solid #d0d7de;
+  }
+
+  .interaction-rules-status.error {
+    color: #cf222e;
+    background: #ffebe9;
+    border-color: #ff8182;
+  }
+
+  .interaction-rules-status.success {
+    color: #1a7f37;
+    background: #dafbe1;
+    border-color: #2da44e;
+  }
+
+  .rules-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+  }
+
+  .interaction-defaults-card,
+  .interaction-rule-card {
+    border: 1px solid #d0d7de;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+
+  .interaction-defaults-card {
+    background: #f6f8fa;
+  }
+
+  .interaction-rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .interaction-rule-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .interaction-rule-title {
+    font-weight: 600;
+    color: #24292f;
+  }
+
+  .interaction-rule-path {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 12px;
+    color: #0969da;
+    word-break: break-all;
+  }
+
+  .interaction-rule-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .rule-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: #ddf4ff;
+    color: #0969da;
+  }
+
+  .rule-badge.off {
+    background: #f6f8fa;
+    color: #57606a;
+  }
+
+  .interaction-rule-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .interaction-empty-state {
+    border: 1px dashed #d0d7de;
+    border-radius: 8px;
+    padding: 18px 14px;
+    text-align: center;
+    color: #656d76;
+    background: #fafbfc;
   }
   
   /* Modal styles */

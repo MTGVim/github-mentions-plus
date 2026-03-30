@@ -9,6 +9,145 @@ let mentionStartPos = null;
 let isInitialized = false;
 let settings = null;
 let cachedUsers = [];
+let interactionConfig = null;
+
+const INTERACTION_CONFIG_STORAGE_KEY = 'githubMentionsPlus_interactionConfig';
+const DEFAULT_INTERACTION_CONFIG = {
+  version: 1,
+  defaultModes: {
+    enterEnabled: true,
+    clickEnabled: true
+  },
+  rules: []
+};
+
+function createDefaultInteractionConfig() {
+  return JSON.parse(JSON.stringify(DEFAULT_INTERACTION_CONFIG));
+}
+
+function normalizePathPrefix(pathPrefix) {
+  if (typeof pathPrefix !== 'string') {
+    return '/';
+  }
+
+  const trimmed = pathPrefix.trim();
+  if (!trimmed || trimmed === '/') {
+    return '/';
+  }
+
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return withLeadingSlash.replace(/\/+$/, '') || '/';
+}
+
+function sanitizeInteractionRule(rule) {
+  if (!rule || typeof rule !== 'object') {
+    return null;
+  }
+
+  const pathPrefix = normalizePathPrefix(rule.pathPrefix);
+  if (!pathPrefix) {
+    return null;
+  }
+
+  return {
+    id: typeof rule.id === 'string' && rule.id.trim() ? rule.id : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    pathPrefix,
+    enterEnabled: rule.enterEnabled !== false,
+    clickEnabled: rule.clickEnabled !== false,
+    updatedAt: typeof rule.updatedAt === 'number' ? rule.updatedAt : Date.now()
+  };
+}
+
+function sanitizeInteractionConfig(config) {
+  const base = createDefaultInteractionConfig();
+  const source = config && typeof config === 'object' ? config : {};
+  const rules = Array.isArray(source.rules)
+    ? source.rules.map(sanitizeInteractionRule).filter(Boolean)
+    : [];
+
+  return {
+    version: 1,
+    defaultModes: {
+      enterEnabled: source.defaultModes?.enterEnabled !== false,
+      clickEnabled: source.defaultModes?.clickEnabled !== false
+    },
+    rules
+  };
+}
+
+function loadInteractionConfigFromLocalStorage() {
+  try {
+    const raw = window.localStorage.getItem(INTERACTION_CONFIG_STORAGE_KEY);
+    if (!raw) {
+      return createDefaultInteractionConfig();
+    }
+
+    return sanitizeInteractionConfig(JSON.parse(raw));
+  } catch (error) {
+    return createDefaultInteractionConfig();
+  }
+}
+
+function saveInteractionConfigToLocalStorage(config) {
+  const sanitized = sanitizeInteractionConfig(config);
+  window.localStorage.setItem(INTERACTION_CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+  interactionConfig = sanitized;
+  return sanitized;
+}
+
+function getEffectiveInteractionState(pathname = window.location.pathname) {
+  const config = interactionConfig || createDefaultInteractionConfig();
+  const normalizedPath = normalizePathPrefix(pathname);
+
+  const matchingRule = config.rules
+    .filter((rule) => normalizedPath.startsWith(rule.pathPrefix))
+    .sort((a, b) => b.pathPrefix.length - a.pathPrefix.length)[0];
+
+  return {
+    enterEnabled: matchingRule ? matchingRule.enterEnabled : config.defaultModes.enterEnabled,
+    clickEnabled: matchingRule ? matchingRule.clickEnabled : config.defaultModes.clickEnabled,
+    matchedRuleId: matchingRule?.id || null,
+    matchedPathPrefix: matchingRule?.pathPrefix || null,
+    currentPath: normalizedPath
+  };
+}
+
+function upsertInteractionRule(ruleInput) {
+  const nextRule = sanitizeInteractionRule(ruleInput);
+  if (!nextRule) {
+    return interactionConfig || createDefaultInteractionConfig();
+  }
+
+  const config = interactionConfig || createDefaultInteractionConfig();
+  const rules = [...config.rules];
+  const existingIndex = rules.findIndex((rule) => rule.id === nextRule.id || rule.pathPrefix === nextRule.pathPrefix);
+
+  if (existingIndex >= 0) {
+    rules[existingIndex] = nextRule;
+  } else {
+    rules.push(nextRule);
+  }
+
+  return saveInteractionConfigToLocalStorage({
+    ...config,
+    rules
+  });
+}
+
+function toggleCurrentPathMode(modeKey) {
+  const currentPath = normalizePathPrefix(window.location.pathname);
+  const effectiveState = getEffectiveInteractionState(currentPath);
+  const existingRule = (interactionConfig?.rules || []).find((rule) => rule.pathPrefix === currentPath);
+  const currentValue = modeKey === 'enterEnabled' ? effectiveState.enterEnabled : effectiveState.clickEnabled;
+
+  return upsertInteractionRule({
+    id: existingRule?.id,
+    pathPrefix: currentPath,
+    enterEnabled: modeKey === 'enterEnabled' ? !currentValue : effectiveState.enterEnabled,
+    clickEnabled: modeKey === 'clickEnabled' ? !currentValue : effectiveState.clickEnabled,
+    updatedAt: Date.now()
+  });
+}
 
 /**
  * Initialize the extension
@@ -24,6 +163,7 @@ async function initialize() {
 
     // Load settings
     settings = await window.GitHubMentionsStorage.getSettings();
+    interactionConfig = loadInteractionConfigFromLocalStorage();
     
     // Create overlay
     window.GitHubMentionsDOM.createOverlay();
@@ -323,6 +463,82 @@ function filterUsers(users, query) {
   return matchingUsers;
 }
 
+async function refreshOverlayForActiveInput() {
+  if (!activeInput || !settings?.enabled) {
+    return;
+  }
+
+  const cursor = activeInput.selectionStart;
+  const text = activeInput.value;
+  const mentionQuery = scanForTrigger(text, cursor);
+  const commandInfo = scanForCommand(text, cursor);
+  const interactionState = getEffectiveInteractionState();
+
+  if (mentionQuery !== null) {
+    mentionStartPos = cursor - mentionQuery.length - 2;
+    const users = await getUsersForSuggestions();
+    const matches = filterUsers(users, mentionQuery);
+
+    if (matches.length > 0) {
+      window.GitHubMentionsDOM.showOverlay(
+        matches,
+        (user) => insertMention(user.username),
+        activeInput,
+        {
+          interactionState,
+          onToggleEnter: async () => {
+            toggleCurrentPathMode('enterEnabled');
+            await refreshOverlayForActiveInput();
+          },
+          onToggleClick: async () => {
+            toggleCurrentPathMode('clickEnabled');
+            await refreshOverlayForActiveInput();
+          }
+        }
+      );
+      return;
+    }
+  }
+
+  if (commandInfo) {
+    const commands = getAvailableCommands();
+    const matches = filterCommands(commands, commandInfo.query);
+
+    if (matches.length > 0) {
+      const commandItems = matches.map((cmd) => ({
+        username: cmd.command,
+        name: cmd.description || cmd.command,
+        isCommand: true,
+        emoji: cmd.emoji || null
+      }));
+
+      window.GitHubMentionsDOM.showOverlay(
+        commandItems,
+        async (cmd) => {
+          await executeCommand(cmd.username, activeInput);
+        },
+        activeInput,
+        {
+          interactionState,
+          onToggleEnter: async () => {
+            toggleCurrentPathMode('enterEnabled');
+            await refreshOverlayForActiveInput();
+          },
+          onToggleClick: async () => {
+            toggleCurrentPathMode('clickEnabled');
+            await refreshOverlayForActiveInput();
+          }
+        }
+      );
+      return;
+    }
+  }
+
+  if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
+    window.GitHubMentionsDOM.hideOverlay();
+  }
+}
+
 /**
  * Handle keyup events on input elements
  * @param {KeyboardEvent} e - Keyup event
@@ -331,7 +547,6 @@ async function onKeyUp(e) {
   if (!activeInput || !settings?.enabled) {
     return;
   }
-
 
   const navigationKeys = ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'];
   if (navigationKeys.includes(e.key)) {
@@ -362,66 +577,7 @@ async function onKeyUp(e) {
   }
 
   try {
-    const cursor = activeInput.selectionStart;
-    const text = activeInput.value;
-    
-    // Check for @ mentions first
-    const mentionQuery = scanForTrigger(text, cursor);
-    // Check for / commands
-    const commandInfo = scanForCommand(text, cursor);
-    
-
-    // Handle Enter key for command execution
-    if (isEnter && commandInfo) {
-      await executeCommand(commandInfo.command, activeInput);
-      if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
-        window.GitHubMentionsDOM.hideOverlay();
-      }
-      return;
-    }
-  
-    // Handle @ mentions
-    if (mentionQuery !== null) {
-      mentionStartPos = cursor - mentionQuery.length - 2; // position of the @@
-    
-      const users = await getUsersForSuggestions();
-      const matches = filterUsers(users, mentionQuery);
-  
-      if (matches.length > 0) {
-        // Check if DOM utilities are available
-        if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.showOverlay === 'function') {
-          window.GitHubMentionsDOM.showOverlay(matches, (user) => insertMention(user.username), activeInput);
-        }
-        return;
-      }
-    }
-    
-    // Handle ! commands
-    if (commandInfo) {
-      const commands = getAvailableCommands();
-      const matches = filterCommands(commands, commandInfo.query);
-      
-      if (matches.length > 0) {
-        if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.showOverlay === 'function') {
-          // Transform commands to look like users for the overlay
-          const commandItems = matches.map(cmd => ({
-            username: cmd.command,
-            name: cmd.description || cmd.command,
-            isCommand: true,
-            emoji: cmd.emoji || null
-          }));
-          window.GitHubMentionsDOM.showOverlay(commandItems, async (cmd) => {
-            await executeCommand(cmd.username, activeInput);
-          }, activeInput);
-        }
-        return;
-      }
-    }
-
-    // Hide overlay if DOM utilities are available
-    if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
-      window.GitHubMentionsDOM.hideOverlay();
-    }
+    await refreshOverlayForActiveInput();
   } catch (error) {
     console.error('[GitHub Mentions+] Keyup processing error:', error);
     // Try to hide overlay even on error
@@ -449,7 +605,10 @@ function onInput(e) {
     if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
       window.GitHubMentionsDOM.hideOverlay();
     }
+    return;
   }
+
+  refreshOverlayForActiveInput();
 }
 
 /**
@@ -574,6 +733,7 @@ async function handleMessage(message, sender, sendResponse) {
       case 'GMP_SETTINGS_UPDATED':
         // Handle settings update from popup
         settings = message.settings;
+        interactionConfig = loadInteractionConfigFromLocalStorage();
         
         // Reload cached users immediately from the updated settings
         if (settings?.directJsonData && settings.directJsonData !== '[]') {
@@ -631,27 +791,30 @@ async function handleMessage(message, sender, sendResponse) {
           const text = activeInput.value;
           const commandInfo = scanForCommand(text, cursor);
           
-          if (commandInfo) {
-            const commands = getAvailableCommands();
-            const matches = filterCommands(commands, commandInfo.query);
-            
-            if (matches.length > 0 && window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.showOverlay === 'function') {
-              const commandItems = matches.map(cmd => ({
-                username: cmd.command,
-                name: cmd.description || cmd.command,
-                isCommand: true,
-                emoji: cmd.emoji || null
-              }));
-              window.GitHubMentionsDOM.showOverlay(commandItems, async (cmd) => {
-                await executeCommand(cmd.username, activeInput);
-              }, activeInput);
-            } else if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.hideOverlay === 'function') {
-              window.GitHubMentionsDOM.hideOverlay();
-            }
-          }
+          await refreshOverlayForActiveInput();
         }
         
         // No need to sendResponse for fire-and-forget messages
+        return;
+
+      case 'GMP_GET_INTERACTION_CONFIG':
+        interactionConfig = loadInteractionConfigFromLocalStorage();
+        sendResponse({
+          success: true,
+          config: interactionConfig,
+          currentPath: window.location.pathname,
+          effectiveState: getEffectiveInteractionState()
+        });
+        return;
+
+      case 'GMP_SET_INTERACTION_CONFIG':
+        interactionConfig = saveInteractionConfigToLocalStorage(message.config);
+        await refreshOverlayForActiveInput();
+        sendResponse({
+          success: true,
+          config: interactionConfig,
+          effectiveState: getEffectiveInteractionState()
+        });
         return;
         
       case 'refreshUsers':
@@ -746,6 +909,22 @@ function handleKeyNavigation(e) {
     return;
   }
 
+  if (window.GitHubMentionsDOM && window.GitHubMentionsDOM.isOverlayVisible() && e.altKey) {
+    if (e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      toggleCurrentPathMode('enterEnabled');
+      refreshOverlayForActiveInput();
+      return;
+    }
+
+    if (e.key.toLowerCase() === 'c') {
+      e.preventDefault();
+      toggleCurrentPathMode('clickEnabled');
+      refreshOverlayForActiveInput();
+      return;
+    }
+  }
+
   // First check if overlay handles the key
   if (window.GitHubMentionsDOM && typeof window.GitHubMentionsDOM.handleKeyNavigation === 'function') {
     const handled = window.GitHubMentionsDOM.handleKeyNavigation(e);
@@ -775,6 +954,11 @@ function handleKeyNavigation(e) {
   
   // Fallback handling for when overlay is not visible
   if (e.key === 'Enter' && activeInput && settings?.enabled) {
+    const interactionState = getEffectiveInteractionState();
+    if (!interactionState.enterEnabled) {
+      return;
+    }
+
     const cursor = activeInput.selectionStart;
     const text = activeInput.value;
     const commandInfo = scanForCommand(text, cursor);
