@@ -28,6 +28,7 @@ cp "$ROOT_DIR/manifest.json" "$OUT_DIR/"
 cp "$ROOT_DIR/background.js" "$OUT_DIR/"
 cp "$ROOT_DIR/content_script.js" "$OUT_DIR/"
 cp -R "$ROOT_DIR/browserAction" "$OUT_DIR/"
+cp -R "$ROOT_DIR/content" "$OUT_DIR/"
 cp -R "$ROOT_DIR/icons" "$OUT_DIR/"
 cp -R "$ROOT_DIR/utils" "$OUT_DIR/"
 

@@ -8,6 +8,7 @@ on:
       - 'background.js'
       - 'content_script.js'
       - 'browserAction/**'
+      - 'content/**'
       - 'icons/**'
       - 'utils/**'
       - 'scripts/build-release-zip.sh'
