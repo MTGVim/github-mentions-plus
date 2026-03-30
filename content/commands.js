@@ -1,6 +1,57 @@
 const contentCommandsRoot = typeof window !== 'undefined' ? window : globalThis;
 contentCommandsRoot.GitHubMentionsContent = contentCommandsRoot.GitHubMentionsContent || {};
 
+const sharedLgtm = contentCommandsRoot.GitHubMentionsLGTM
+  || (typeof module !== 'undefined' && module.exports ? require('../utils/lgtm.js') : null);
+
+function pickRandomLgtmGif(randomFn = Math.random) {
+  return sharedLgtm?.pickRandomLgtmGif(null, randomFn) || null;
+}
+
+function requestLgtmFromBackground() {
+  if (!chrome?.runtime?.sendMessage) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise((resolve) => {
+    try {
+      chrome.runtime.sendMessage(
+        { action: 'fetchRandomLGTM' },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            resolve(null);
+            return;
+          }
+
+          resolve(response || null);
+        }
+      );
+    } catch (error) {
+      resolve(null);
+    }
+  });
+}
+
+async function resolveLgtmCommandResult() {
+  const backgroundResult = await requestLgtmFromBackground();
+  if (backgroundResult?.success && backgroundResult.imageUrl) {
+    return backgroundResult;
+  }
+
+  const curatedGif = pickRandomLgtmGif();
+  if (!curatedGif) {
+    return null;
+  }
+
+  console.warn('[GitHub Mentions+] LGTM command fell back to curated content because background fetch was unavailable.');
+
+  return {
+    success: true,
+    imageUrl: curatedGif,
+    source: 'curated-content-fallback'
+  };
+}
+
 function getBuiltInCommands() {
   return [
     {
@@ -43,27 +94,10 @@ async function executeCommand(command, input, settings) {
     let result = '';
 
     if (command === 'lgtmrand') {
-      try {
-        const lgtmResult = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage(
-            { action: 'fetchRandomLGTM' },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-                return;
-              }
-
-              resolve(response);
-            }
-          );
-        });
-
-        if (lgtmResult && lgtmResult.success && lgtmResult.imageUrl) {
-          result = `![LGTM](${lgtmResult.imageUrl})`;
-        } else {
-          return false;
-        }
-      } catch (error) {
+      const lgtmResult = await resolveLgtmCommandResult();
+      if (lgtmResult?.success && lgtmResult.imageUrl) {
+        result = `![LGTM](${lgtmResult.imageUrl})`;
+      } else {
         return false;
       }
     } else {
@@ -109,9 +143,13 @@ contentCommandsRoot.GitHubMentionsContent.executeCommand = executeCommand;
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    CURATED_LGTM_GIFS: sharedLgtm?.CURATED_LGTM_GIFS || [],
     getBuiltInCommands,
     buildAvailableCommands,
     applyCommandTemplate,
+    pickRandomLgtmGif,
+    requestLgtmFromBackground,
+    resolveLgtmCommandResult,
     executeCommand
   };
 }

@@ -3,19 +3,17 @@
  * Handles CORS-restricted API calls like LGTM random image fetching
  */
 
+if (typeof globalThis.GitHubMentionsLGTM === 'undefined' && typeof importScripts === 'function') {
+  importScripts('utils/lgtm.js');
+}
+
+const sharedLgtm = globalThis.GitHubMentionsLGTM
+  || (typeof module !== 'undefined' && module.exports ? require('./utils/lgtm.js') : null);
+
 const REQUEST_TIMEOUT = 10000;
 const LGTM_RELOADED_URL = 'https://us-central1-lgtm-reloaded.cloudfunctions.net/lgtm';
 const FALLBACK_LGTM_GIF = 'https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif';
-const CURATED_LGTM_GIFS = [
-  'https://media.giphy.com/media/l3q2XhfQ8oCkm1Ts4/giphy.gif',
-  'https://media.giphy.com/media/111ebonMs90YLu/giphy.gif',
-  'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif',
-  'https://media.giphy.com/media/3orieKZ9ax8nsJnSs8/giphy.gif',
-  'https://media.giphy.com/media/5VKbvrjxpVJCM/giphy.gif',
-  'https://media.giphy.com/media/xT0xeJpnrWC4XWblEk/giphy.gif',
-  'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif',
-  'https://media.giphy.com/media/QMHoU66sBXqqLqYvGO/giphy.gif'
-];
+const CURATED_LGTM_GIFS = sharedLgtm?.CURATED_LGTM_GIFS || [];
 
 let lastDeliveredLgtmUrl = null;
 
@@ -89,14 +87,12 @@ async function fetchRandomLGTMFromReloaded(fetchImpl = fetchWithTimeout, options
 }
 
 function getCuratedLgtmPool() {
-  return CURATED_LGTM_GIFS.slice();
+  return sharedLgtm?.getCuratedLgtmPool?.() || [];
 }
 
 function pickRandomCuratedLgtm(excludedUrl = null, randomFn = Math.random) {
-  const pool = getCuratedLgtmPool().filter((url) => url !== excludedUrl);
-  const targetPool = pool.length > 0 ? pool : getCuratedLgtmPool();
-
-  if (targetPool.length === 0) {
+  const imageUrl = sharedLgtm?.pickRandomLgtmGif?.(excludedUrl, randomFn) || null;
+  if (!imageUrl) {
     return normalizeLgtmResult({
       success: false,
       source: 'curated',
@@ -104,10 +100,9 @@ function pickRandomCuratedLgtm(excludedUrl = null, randomFn = Math.random) {
     });
   }
 
-  const index = Math.floor(randomFn() * targetPool.length);
   return normalizeLgtmResult({
     success: true,
-    imageUrl: targetPool[index],
+    imageUrl,
     source: 'curated'
   });
 }

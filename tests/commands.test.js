@@ -2,8 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  CURATED_LGTM_GIFS,
   buildAvailableCommands,
   applyCommandTemplate,
+  resolveLgtmCommandResult,
   executeCommand
 } = require('../content/commands.js');
 
@@ -51,6 +53,60 @@ test('executeCommand replaces the full @! trigger including the at sign', async 
 
   assert.equal(success, true);
   assert.equal(input.value, 'Please check approved');
+});
+
+test('resolveLgtmCommandResult falls back to curated content when background messaging fails', async () => {
+  globalThis.chrome = {
+    runtime: {
+      lastError: { message: 'No receiving end' },
+      sendMessage(_message, callback) {
+        callback(undefined);
+      }
+    }
+  };
+
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+
+  try {
+    const result = await resolveLgtmCommandResult();
+    assert.deepEqual(result, {
+      success: true,
+      imageUrl: CURATED_LGTM_GIFS[0],
+      source: 'curated-content-fallback'
+    });
+  } finally {
+    Math.random = originalRandom;
+  }
+});
+
+test('executeCommand inserts curated LGTM fallback when runtime request fails', async () => {
+  globalThis.chrome = {
+    runtime: {
+      lastError: { message: 'No receiving end' },
+      sendMessage(_message, callback) {
+        callback(undefined);
+      }
+    }
+  };
+
+  const originalRandom = Math.random;
+  Math.random = () => 0;
+
+  const input = {
+    value: 'Please check @!lgtmrand',
+    selectionStart: 'Please check @!lgtmrand'.length,
+    selectionEnd: 'Please check @!lgtmrand'.length,
+    dispatchEvent() {}
+  };
+
+  try {
+    const success = await executeCommand('lgtmrand', input, {});
+    assert.equal(success, true);
+    assert.equal(input.value, `Please check ![LGTM](${CURATED_LGTM_GIFS[0]})`);
+  } finally {
+    Math.random = originalRandom;
+  }
 });
 
 function createNavigationEnvironment(items) {

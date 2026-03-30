@@ -16,7 +16,8 @@
 		"storage"
 	],
 	"host_permissions": [
-		"*://*.github.com/*"
+		"*://*.github.com/*",
+		"https://us-central1-lgtm-reloaded.cloudfunctions.net/*"
 	],
 	"content_scripts": [
 		{
@@ -27,6 +28,7 @@
 				"utils/settings.js",
 				"utils/storage.js",
 				"utils/api.js",
+				"utils/lgtm.js",
 				"utils/overlay/state.js",
 				"utils/overlay/position.js",
 				"utils/overlay/render.js",
