@@ -30,7 +30,7 @@
 2. Load the repo as unpacked.
 3. Verify `@@` mentions still open the custom suggestion overlay.
 4. Verify `!` commands still expand correctly.
-5. Verify interaction rules can be added, edited, deleted, exported, and imported.
+5. Verify mouse click and keyboard selection both work inside GitHub modals and regular comment areas.
 6. Verify settings persist after reloading the extension.
 
 ## Chrome Web Store Submission
@@ -53,4 +53,4 @@
 ## Notes
 
 - Source control files, `.codex/`, and `.spec-workflow/` are intentionally excluded from the release zip.
-- Interaction rules are stored in GitHub page `localStorage`, so store reviewers should test on actual GitHub pages.
+- Settings export/import should round-trip correctly through the popup JSON backup flow.

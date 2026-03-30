@@ -141,21 +141,15 @@
         </section>
 
         <section class="settings-section">
-          <h2>Interaction Rules</h2>
+          <h2>Settings Backup</h2>
           <div class="form-group">
-            <p class="subtitle">Configure Enter and Click behavior per GitHub path prefix. Rules match with <code>pathname.startsWith(pathPrefix)</code>.</p>
+            <p class="subtitle">Export or import your extension settings as JSON.</p>
           </div>
           <div class="rules-toolbar">
             <button id="exportSettings" class="btn btn-secondary">Export JSON</button>
             <button id="importSettings" class="btn btn-secondary">Import JSON</button>
             <input type="file" id="importSettingsFile" accept="application/json,.json" class="hidden">
           </div>
-          <div id="interactionRulesStatus" class="interaction-rules-status">Loading rule storage from active GitHub tab...</div>
-          <div class="rules-toolbar">
-            <button id="addInteractionRule" class="btn btn-secondary">+ Add Rule</button>
-          </div>
-          <div id="interactionDefaultsCard" class="interaction-defaults-card hidden"></div>
-          <div id="interactionRulesList" class="interaction-rules-list"></div>
         </section>
 
         <section class="settings-section">
@@ -233,36 +227,6 @@ Available variables: ${timestamp}, ${date}, ${time}"></textarea>
         <div class="modal-footer">
           <button id="modalCancel" class="btn btn-secondary">Cancel</button>
           <button id="modalSave" class="btn btn-primary">Save</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="interactionRuleModal" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3 id="interactionRuleModalTitle">Add Interaction Rule</h3>
-          <button id="interactionRuleModalClose" class="modal-close">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label for="interactionRulePathPrefix">Path Prefix</label>
-            <input type="text" id="interactionRulePathPrefix" class="form-control" placeholder="/owner/repo/issues">
-            <small class="help-text">Applied when <code>window.location.pathname.startsWith(pathPrefix)</code> is true.</small>
-          </div>
-          <div class="form-group checkbox-group">
-            <label class="checkbox-option">
-              <input type="checkbox" id="interactionRuleEnterEnabled" checked>
-              <span class="radio-label">Enable Enter selection</span>
-            </label>
-            <label class="checkbox-option">
-              <input type="checkbox" id="interactionRuleClickEnabled" checked>
-              <span class="radio-label">Enable Click selection</span>
-            </label>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button id="interactionRuleModalCancel" class="btn btn-secondary">Cancel</button>
-          <button id="interactionRuleModalSave" class="btn btn-primary">Save</button>
         </div>
       </div>
     </div>

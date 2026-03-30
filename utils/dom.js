@@ -23,12 +23,6 @@ let overlay = null;
 let lastGoodPosition = null;
 let selectedIndex = 0;
 let overlayItems = [];
-let overlayInteractionState = {
-  enterEnabled: true,
-  clickEnabled: true,
-  currentPath: '/',
-  matchedPathPrefix: null
-};
 
 window.GitHubMentionsDOM.getSelectedBgColor = function(isDarkMode) {
   return isDarkMode ? '#1f6feb' : '#9ec9f9ff';
@@ -126,7 +120,7 @@ window.GitHubMentionsDOM.isActiveInputInDialog = function(activeInput) {
  * @param {Function} onSelect - Callback when a user is selected
  * @param {HTMLElement} activeInput - The active input element for positioning
  */
-window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput, options = {}) {
+window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput) {
   if (!overlay || !Array.isArray(users) || users.length === 0) {
     return;
   }
@@ -147,14 +141,6 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput, op
   currentSelectedIndex = 0; 
   overlayItems = [];
   lastKeyNavTime = 0;
-  overlayInteractionState = {
-    enterEnabled: options.interactionState?.enterEnabled !== false,
-    clickEnabled: options.interactionState?.clickEnabled !== false,
-    currentPath: options.interactionState?.currentPath || window.location.pathname,
-    matchedPathPrefix: options.interactionState?.matchedPathPrefix || null
-  };
-
-  const isInDialog = window.GitHubMentionsDOM.isActiveInputInDialog(activeInput);
 
   // Create suggestion items
   users.slice(0, 4).forEach((user, index) => {
@@ -168,7 +154,7 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput, op
       display: flex;
       align-items: center;
       padding: 0.5rem;
-      cursor: ${overlayInteractionState.clickEnabled ? 'pointer' : 'default'};
+      cursor: pointer;
       transition: all 0.15s ease;
       background-color: ${isSelected ? window.GitHubMentionsDOM.getSelectedBgColor(isDarkMode) : defaultBgColor};
       color: ${isSelected ? '#ffffff' : ''};
@@ -198,10 +184,6 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput, op
 
     // Add mousedown handler
     item.addEventListener('mousedown', (e) => {
-      if (!overlayInteractionState.clickEnabled) {
-        return;
-      }
-
       e.preventDefault();
       e.stopPropagation();
       
@@ -315,87 +297,6 @@ window.GitHubMentionsDOM.showOverlay = function(users, onSelect, activeInput, op
     item.appendChild(textContent);
     overlay.appendChild(item);
   });
-
-  const footer = document.createElement('div');
-  footer.className = 'github-mentions-overlay-footer';
-  footer.style.cssText = `
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.5rem 0.75rem 0.65rem;
-    border-top: 1px solid rgba(128, 128, 128, 0.2);
-    margin-top: 0.35rem;
-    font-size: 11px;
-    color: ${colors.name};
-    background: ${colors.background};
-  `;
-
-  const toggleRow = document.createElement('div');
-  toggleRow.style.cssText = `
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-  `;
-
-  const toggles = document.createElement('div');
-  toggles.style.cssText = `
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  `;
-
-  const enterToggle = createOverlayToggle(
-    'Enter',
-    overlayInteractionState.enterEnabled,
-    'Alt+E',
-    () => options.onToggleEnter?.()
-  );
-  const clickToggle = createOverlayToggle(
-    'Click',
-    overlayInteractionState.clickEnabled,
-    'Alt+C',
-    () => options.onToggleClick?.()
-  );
-
-  toggles.appendChild(enterToggle);
-  toggles.appendChild(clickToggle);
-  toggleRow.appendChild(toggles);
-
-  const pathMeta = document.createElement('div');
-  pathMeta.style.cssText = `
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    align-items: flex-start;
-  `;
-
-  const currentPathText = document.createElement('div');
-  currentPathText.textContent = `Path: ${overlayInteractionState.currentPath}`;
-  currentPathText.style.cssText = `
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  `;
-
-  const ruleSourceText = document.createElement('div');
-  ruleSourceText.textContent = overlayInteractionState.matchedPathPrefix
-    ? `Rule: startsWith("${overlayInteractionState.matchedPathPrefix}")`
-    : 'Rule: default';
-
-  pathMeta.appendChild(currentPathText);
-  pathMeta.appendChild(ruleSourceText);
-
-  if (isInDialog && !overlayInteractionState.clickEnabled) {
-    const dialogHint = document.createElement('div');
-    dialogHint.textContent = 'Dialog context: click selection is off.';
-    pathMeta.appendChild(dialogHint);
-  }
-
-  footer.appendChild(toggleRow);
-  footer.appendChild(pathMeta);
-  overlay.appendChild(footer);
 
   // Make overlay visible first so we can measure its width
   overlay.style.display = 'block';
@@ -560,9 +461,6 @@ window.GitHubMentionsDOM.handleKeyNavigation = function(e) {
       return true;
       
     case 'Enter':
-      if (!overlayInteractionState.enterEnabled) {
-        return false;
-      }
       e.preventDefault();
       e.stopPropagation();
       if (overlayItems[selectedIndex] && overlayItems[selectedIndex].userData) {
@@ -595,32 +493,3 @@ window.GitHubMentionsDOM.getSelectedItem = function() {
   }
   return null;
 };
-
-function createOverlayToggle(label, checked, shortcut, onChange) {
-  const wrapper = document.createElement('label');
-  wrapper.style.cssText = `
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    cursor: pointer;
-    user-select: none;
-  `;
-
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = checked;
-  input.style.margin = '0';
-  input.addEventListener('change', (event) => {
-    event.stopPropagation();
-    if (typeof onChange === 'function') {
-      onChange(input.checked);
-    }
-  });
-
-  const text = document.createElement('span');
-  text.textContent = `${label} (${shortcut})`;
-
-  wrapper.appendChild(input);
-  wrapper.appendChild(text);
-  return wrapper;
-}
