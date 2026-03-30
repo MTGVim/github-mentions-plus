@@ -1,33 +1,88 @@
 const overlayPositionRoot = typeof window !== 'undefined' ? window : globalThis;
 overlayPositionRoot.GitHubMentionsOverlay = overlayPositionRoot.GitHubMentionsOverlay || {};
 
-overlayPositionRoot.GitHubMentionsOverlay.updateOverlayPosition = function(activeInput) {
+function applyFallbackPosition(activeInput, overlay) {
+  const rect = activeInput.getBoundingClientRect();
+  overlay.style.left = `${Math.round(rect.left)}px`;
+  overlay.style.top = `${Math.round(rect.bottom)}px`;
+}
+
+overlayPositionRoot.GitHubMentionsOverlay.updateOverlayPosition = async function(activeInput) {
   const state = overlayPositionRoot.GitHubMentionsOverlay.state;
   if (!state?.overlay || !activeInput) {
     return;
   }
 
-  const rect = activeInput.getBoundingClientRect();
-  state.overlay.style.left = `${rect.left}px`;
-  state.overlay.style.top = `${rect.bottom + 6 + activeInput.scrollTop}px`;
-  state.overlay.style.width = `${rect.width}px`;
-  state.overlay.style.borderRadius = '0.75rem';
-  state.overlay.style.position = 'fixed';
-  state.overlay.style.margin = '0';
+  const overlay = state.overlay;
+  const requestId = state.positionRequestId + 1;
+  state.positionRequestId = requestId;
+  const anchorRect = overlayPositionRoot.GitHubMentionsOverlay.getSelectionAnchorRect?.(activeInput)
+    || activeInput.getBoundingClientRect();
+  const floatingUi = overlayPositionRoot.GitHubMentionsVendor || {};
 
-  if (!state.overlay.hasAttribute('popover')) {
-    state.overlay.setAttribute('popover', 'manual');
+  overlay.style.left = '0px';
+  overlay.style.top = '0px';
+  overlay.style.width = 'max-content';
+  overlay.style.maxWidth = 'min(360px, calc(100vw - 24px))';
+  overlay.style.borderRadius = '0.75rem';
+  overlay.style.position = 'fixed';
+  overlay.style.margin = '0';
+
+  if (!overlay.hasAttribute('popover')) {
+    overlay.setAttribute('popover', 'manual');
     if (activeInput.id) {
-      state.overlay.setAttribute('popover-target', activeInput.id);
+      overlay.setAttribute('popover-target', activeInput.id);
     }
   }
 
-  if (!state.overlay.matches(':popover-open')) {
+  if (!overlay.matches(':popover-open')) {
     try {
-      state.overlay.showPopover();
+      overlay.showPopover();
     } catch (error) {
       // ignore already-open popovers
     }
+  }
+
+  if (typeof floatingUi.computePosition !== 'function') {
+    applyFallbackPosition(activeInput, overlay);
+    return;
+  }
+
+  try {
+    const { x, y } = await floatingUi.computePosition(
+      {
+        contextElement: activeInput,
+        getBoundingClientRect() {
+          return anchorRect;
+        }
+      },
+      overlay,
+      {
+        placement: 'bottom-start',
+        strategy: 'fixed',
+        middleware: [
+          floatingUi.offset(0),
+          floatingUi.flip({
+            padding: 12,
+            fallbackPlacements: ['top-start', 'bottom-start']
+          }),
+          floatingUi.shift({
+            padding: 12,
+            limiter: floatingUi.limitShift()
+          })
+        ]
+      }
+    );
+
+    if (state.positionRequestId !== requestId) {
+      return;
+    }
+
+    overlay.style.left = `${Math.round(x)}px`;
+    overlay.style.top = `${Math.round(y)}px`;
+    state.lastGoodPosition = { x, y };
+  } catch (error) {
+    applyFallbackPosition(activeInput, overlay);
   }
 };
 

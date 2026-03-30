@@ -25,20 +25,7 @@
 				"*://*.github.com/*"
 			],
 			"js": [
-				"utils/settings.js",
-				"utils/storage.js",
-				"utils/api.js",
-				"utils/lgtm.js",
-				"utils/overlay/state.js",
-				"utils/overlay/position.js",
-				"utils/overlay/render.js",
-				"utils/overlay/navigation.js",
-				"utils/dom.js",
-				"content/triggers.js",
-				"content/commands.js",
-				"content/users-source.js",
-				"content/app.js",
-				"content_script.js"
+				"content.bundle.js"
 			]
 		}
 	],

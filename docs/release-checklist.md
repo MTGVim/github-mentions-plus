@@ -3,9 +3,10 @@
 ## Package
 
 1. Bump `manifest.json` version.
-2. Run `bash scripts/build-release-zip.sh`.
-3. Confirm the zip exists under `release/`.
-4. Inspect the zip contents and verify only extension runtime files are included.
+2. Run `npm run build`.
+3. Run `bash scripts/build-release-zip.sh`.
+4. Confirm the zip exists under `release/`.
+5. Inspect the zip contents and verify only extension runtime files are included.
 
 ## GitHub Release Automation
 

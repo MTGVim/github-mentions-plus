@@ -203,6 +203,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
       input.addEventListener('keydown', handleKeyDown);
       input.addEventListener('keyup', onKeyUp);
       input.addEventListener('input', onInput);
+      input.addEventListener('scroll', handleScroll);
       input.addEventListener('blur', () => {
         setTimeout(() => getApi().dom.hideOverlay(), 100);
       });
@@ -248,6 +249,13 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
   }
 
   function handleResize() {
+    const { dom } = getApi();
+    if (state.activeInput && dom.isOverlayVisible()) {
+      dom.updateOverlayPosition(state.activeInput);
+    }
+  }
+
+  function handleScroll() {
     const { dom } = getApi();
     if (state.activeInput && dom.isOverlayVisible()) {
       dom.updateOverlayPosition(state.activeInput);
@@ -348,6 +356,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
     handleFocusIn,
     handleMessage,
     handleResize,
+    handleScroll,
     handleVisibilityChange,
     initialize,
     scanInputs

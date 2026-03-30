@@ -1,0 +1,9 @@
+import '../utils/settings.js';
+import '../utils/storage.js';
+import '../browserAction/popup/shared.js';
+import '../browserAction/popup/status-ui.js';
+import '../browserAction/popup/users-table.js';
+import '../browserAction/popup/commands-manager.js';
+import '../browserAction/popup/backup-manager.js';
+import '../browserAction/popup/settings-form.js';
+import '../browserAction/script.js';

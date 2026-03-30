@@ -4,6 +4,7 @@ overlayStateRoot.GitHubMentionsOverlay = overlayStateRoot.GitHubMentionsOverlay 
 overlayStateRoot.GitHubMentionsOverlay.state = {
   overlay: null,
   lastGoodPosition: null,
+  positionRequestId: 0,
   selectedIndex: 0,
   currentSelectedIndex: 0,
   overlayItems: [],

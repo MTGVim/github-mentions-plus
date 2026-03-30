@@ -17,6 +17,7 @@ if (app) {
   document.addEventListener('visibilitychange', () => app.handleVisibilityChange());
   document.addEventListener('focusin', (event) => app.handleFocusIn(event), true);
   window.addEventListener('resize', () => app.handleResize());
+  window.addEventListener('scroll', () => app.handleScroll(), true);
   window.addEventListener('beforeunload', () => app.cleanup());
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
