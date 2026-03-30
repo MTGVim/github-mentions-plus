@@ -1,7 +1,11 @@
 const overlayNavigationRoot = typeof window !== 'undefined' ? window : globalThis;
 overlayNavigationRoot.GitHubMentionsOverlay = overlayNavigationRoot.GitHubMentionsOverlay || {};
 
-overlayNavigationRoot.GitHubMentionsOverlay.handleKeyNavigation = function(event) {
+function createNavigationAction(type, item) {
+  return item ? { type, item } : { type };
+}
+
+function handleKeyNavigation(event) {
   const overlayApi = overlayNavigationRoot.GitHubMentionsOverlay;
   const state = overlayApi.state;
   if (!state?.overlay || !overlayApi.isOverlayVisible() || state.overlayItems.length === 0) {
@@ -18,7 +22,7 @@ overlayNavigationRoot.GitHubMentionsOverlay.handleKeyNavigation = function(event
   const now = Date.now();
   if (now - state.lastKeyNavTime < state.KEY_NAV_DELAY && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
     event.preventDefault();
-    return true;
+    return createNavigationAction('move');
   }
 
   switch (event.key) {
@@ -31,7 +35,7 @@ overlayNavigationRoot.GitHubMentionsOverlay.handleKeyNavigation = function(event
         overlayApi.updateSelection();
         state.lastKeyNavTime = now;
       }
-      return true;
+      return createNavigationAction('move');
 
     case 'ArrowUp':
       event.preventDefault();
@@ -42,20 +46,45 @@ overlayNavigationRoot.GitHubMentionsOverlay.handleKeyNavigation = function(event
         overlayApi.updateSelection();
         state.lastKeyNavTime = now;
       }
-      return true;
+      return createNavigationAction('move');
 
-    case 'Enter':
+    case 'Enter': {
       event.preventDefault();
       event.stopPropagation();
-      return state.overlayItems[state.selectedIndex]?.userData || false;
+      const item = state.overlayItems[state.selectedIndex]?.userData;
+      if (!item) {
+        return false;
+      }
+
+      if (!item.isCommand) {
+        return createNavigationAction('select', item);
+      }
+
+      const isConfirmShortcut = overlayNavigationRoot.GitHubMentionsContent?.isCommandConfirmShortcut
+        ? overlayNavigationRoot.GitHubMentionsContent.isCommandConfirmShortcut(event, navigator)
+        : false;
+
+      return isConfirmShortcut
+        ? createNavigationAction('select', item)
+        : createNavigationAction('blocked-command-select', item);
+    }
 
     case 'Escape':
       event.preventDefault();
       event.stopPropagation();
       overlayApi.hideOverlay();
-      return true;
+      return createNavigationAction('close');
 
     default:
       return false;
   }
-};
+}
+
+overlayNavigationRoot.GitHubMentionsOverlay.handleKeyNavigation = handleKeyNavigation;
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    createNavigationAction,
+    handleKeyNavigation
+  };
+}

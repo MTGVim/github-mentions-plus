@@ -1,6 +1,32 @@
 const contentCommandsRoot = typeof window !== 'undefined' ? window : globalThis;
 contentCommandsRoot.GitHubMentionsContent = contentCommandsRoot.GitHubMentionsContent || {};
 
+function isMacPlatform(platformInfo) {
+  const userAgentPlatform = platformInfo?.userAgentData?.platform;
+  const fallbackPlatform = platformInfo?.platform;
+  const platform = typeof userAgentPlatform === 'string' && userAgentPlatform
+    ? userAgentPlatform
+    : fallbackPlatform;
+
+  return typeof platform === 'string' && platform.toLowerCase().includes('mac');
+}
+
+function isCommandConfirmShortcut(event, platformInfo) {
+  if (!event || event.key !== 'Enter') {
+    return false;
+  }
+
+  if (isMacPlatform(platformInfo)) {
+    return event.metaKey === true;
+  }
+
+  return event.ctrlKey === true;
+}
+
+function getCommandConfirmHint(platformInfo) {
+  return isMacPlatform(platformInfo) ? 'Cmd+Enter' : 'Ctrl+Enter';
+}
+
 function getBuiltInCommands() {
   return [
     {
@@ -105,12 +131,18 @@ async function executeCommand(command, input, settings) {
 contentCommandsRoot.GitHubMentionsContent.getBuiltInCommands = getBuiltInCommands;
 contentCommandsRoot.GitHubMentionsContent.buildAvailableCommands = buildAvailableCommands;
 contentCommandsRoot.GitHubMentionsContent.applyCommandTemplate = applyCommandTemplate;
+contentCommandsRoot.GitHubMentionsContent.isMacPlatform = isMacPlatform;
+contentCommandsRoot.GitHubMentionsContent.isCommandConfirmShortcut = isCommandConfirmShortcut;
+contentCommandsRoot.GitHubMentionsContent.getCommandConfirmHint = getCommandConfirmHint;
 contentCommandsRoot.GitHubMentionsContent.executeCommand = executeCommand;
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     getBuiltInCommands,
     buildAvailableCommands,
-    applyCommandTemplate
+    applyCommandTemplate,
+    isMacPlatform,
+    isCommandConfirmShortcut,
+    getCommandConfirmHint
   };
 }

@@ -151,14 +151,23 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
       return;
     }
 
-    const result = dom.handleKeyNavigation(event);
-    if (result && typeof result === 'object') {
-      if (result.isCommand) {
-        contentAppRoot.GitHubMentionsContent.executeCommand(result.username, state.activeInput, state.settings);
+    const action = dom.handleKeyNavigation(event);
+    if (!action || typeof action !== 'object' || !action.type) {
+      return;
+    }
+
+    if (action.type === 'select' && action.item) {
+      if (action.item.isCommand) {
+        contentAppRoot.GitHubMentionsContent.executeCommand(action.item.username, state.activeInput, state.settings);
       } else {
-        insertMention(result.username);
+        insertMention(action.item.username);
       }
       dom.hideOverlay();
+      return;
+    }
+
+    if (action.type === 'blocked-command-select') {
+      return;
     }
   }
 
