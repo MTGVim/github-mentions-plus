@@ -1,6 +1,23 @@
-window.GitHubMentionsPopup = window.GitHubMentionsPopup || {};
+const popupUsersTableRoot = typeof window !== 'undefined' ? window : globalThis;
+popupUsersTableRoot.GitHubMentionsPopup = popupUsersTableRoot.GitHubMentionsPopup || {};
 
-window.GitHubMentionsPopup.createUsersTable = function(context) {
+function getUserRowValues(row) {
+  return {
+    username: row.querySelector('.user-username').value.trim(),
+    name: row.querySelector('.user-name').value.trim(),
+    profile: row.querySelector('.user-profile').value.trim()
+  };
+}
+
+function isUserRowBlank(rowValues) {
+  return !rowValues.username && !rowValues.name && !rowValues.profile;
+}
+
+function isUserRowValid(rowValues) {
+  return isUserRowBlank(rowValues) || Boolean(rowValues.username);
+}
+
+popupUsersTableRoot.GitHubMentionsPopup.createUsersTable = function(context) {
   function syncTableToJson() {
     const { userTableBody, directJsonData } = context.dom;
     if (!userTableBody) return;
@@ -9,9 +26,7 @@ window.GitHubMentionsPopup.createUsersTable = function(context) {
     const users = [];
 
     rows.forEach((row) => {
-      const username = row.querySelector('.user-username').value.trim();
-      const name = row.querySelector('.user-name').value.trim();
-      const profile = row.querySelector('.user-profile').value.trim();
+      const { username, name, profile } = getUserRowValues(row);
 
       if (username) {
         users.push({ username, name: name || '', profile: profile || '' });
@@ -23,8 +38,9 @@ window.GitHubMentionsPopup.createUsersTable = function(context) {
 
   function validateUserRow(row) {
     const usernameInput = row.querySelector('.user-username');
-    const username = usernameInput.value.trim();
-    if (!username) {
+    const rowValues = getUserRowValues(row);
+
+    if (!isUserRowValid(rowValues)) {
       usernameInput.classList.add('invalid');
       row.classList.add('error');
       return false;
@@ -105,3 +121,11 @@ window.GitHubMentionsPopup.createUsersTable = function(context) {
     validateAllRows
   };
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    getUserRowValues,
+    isUserRowBlank,
+    isUserRowValid
+  };
+}
