@@ -81,11 +81,9 @@ window.GitHubMentionsStorage.getCachedUsers = async function() {
     }
 
     // Validate user data structure
-    const validUsers = cachedData.filter(user => 
-      user && typeof user === 'object' && 
-      typeof user.username === 'string' && 
-      typeof user.name === 'string'
-    );
+    const validUsers = window.GitHubMentionsSettings
+      ? window.GitHubMentionsSettings.normalizeUsersForCache(cachedData)
+      : [];
 
     if (validUsers.length !== cachedData.length) {
       return [];
@@ -108,12 +106,9 @@ window.GitHubMentionsStorage.setCachedUsers = async function(users) {
       return false;
     }
 
-    // Validate user data structure
-    const validUsers = users.filter(user => 
-      user && typeof user === 'object' && 
-      typeof user.username === 'string' && 
-      typeof user.name === 'string'
-    );
+    const validUsers = window.GitHubMentionsSettings
+      ? window.GitHubMentionsSettings.normalizeUsersForCache(users)
+      : [];
 
     if (validUsers.length !== users.length) {
       return false;
@@ -159,6 +154,9 @@ window.GitHubMentionsStorage.clearCache = async function() {
 window.GitHubMentionsStorage.getSettings = async function() {
   try {
     const result = await chrome.storage.local.get('githubMentions_settings');
+    if (window.GitHubMentionsSettings) {
+      return window.GitHubMentionsSettings.normalizeSettings(result.githubMentions_settings);
+    }
     return result.githubMentions_settings || {
       dataSource: 'gui',
       directJsonData: '',
@@ -166,12 +164,14 @@ window.GitHubMentionsStorage.getSettings = async function() {
       customCommands: {}
     };
   } catch (error) {
-    return {
-      dataSource: 'gui',
-      directJsonData: '',
-      enabled: true,
-      customCommands: {}
-    };
+    return window.GitHubMentionsSettings
+      ? window.GitHubMentionsSettings.getDefaultSettings()
+      : {
+          dataSource: 'gui',
+          directJsonData: '',
+          enabled: true,
+          customCommands: {}
+        };
   }
 };
 
@@ -182,13 +182,11 @@ window.GitHubMentionsStorage.getSettings = async function() {
  */
 window.GitHubMentionsStorage.setSettings = async function(settings) {
   try {
+    const normalizedSettings = window.GitHubMentionsSettings
+      ? window.GitHubMentionsSettings.normalizeSettings(settings)
+      : settings;
     await chrome.storage.local.set({
-      'githubMentions_settings': {
-        dataSource: settings.dataSource || 'gui',
-        directJsonData: settings.directJsonData || '',
-        enabled: settings.enabled !== false,
-        customCommands: settings.customCommands || {}
-      }
+      'githubMentions_settings': normalizedSettings
     });
     return true;
   } catch (error) {
