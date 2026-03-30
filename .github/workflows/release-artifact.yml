@@ -1,0 +1,37 @@
+name: Build Release Artifact
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'manifest.json'
+      - 'background.js'
+      - 'content_script.js'
+      - 'browserAction/**'
+      - 'icons/**'
+      - 'utils/**'
+      - 'scripts/build-release-zip.sh'
+      - '.github/workflows/release-artifact.yml'
+      - '.github/workflows/release.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-artifact:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build zip
+        shell: bash
+        run: bash scripts/build-release-zip.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-mentions-plus-release-zip
+          path: release/*.zip
+          if-no-files-found: error

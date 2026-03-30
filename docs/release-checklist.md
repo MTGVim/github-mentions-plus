@@ -1,0 +1,54 @@
+# Release Checklist
+
+## Package
+
+1. Bump `manifest.json` version.
+2. Run `bash scripts/build-release-zip.sh`.
+3. Confirm the zip exists under `release/`.
+4. Inspect the zip contents and verify only extension runtime files are included.
+
+## GitHub Release Automation
+
+1. Commit the version bump.
+2. Create a matching tag, for example `git tag v1.1.0`.
+3. Push the branch and tag:
+   - `git push origin main`
+   - `git push origin v1.1.0`
+4. The `Release Extension` workflow will:
+   - validate that `manifest.json` version matches the tag
+   - build `release/github-mentions-plus-v<version>.zip`
+   - create a GitHub Release
+   - generate release notes automatically
+   - upload the zip as a release asset
+5. For non-release verification, use the `Build Release Artifact` workflow or PR workflow artifact.
+
+## Smoke Test
+
+1. Open `chrome://extensions/` or `edge://extensions/`.
+2. Load the repo as unpacked.
+3. Verify `@@` mentions still open the custom suggestion overlay.
+4. Verify `!` commands still expand correctly.
+5. Verify interaction rules can be added, edited, deleted, exported, and imported.
+6. Verify settings persist after reloading the extension.
+
+## Chrome Web Store Submission
+
+1. Open the Chrome Web Store Developer Dashboard.
+2. Upload `release/github-mentions-plus-v<version>.zip`.
+3. Update listing text, screenshots, and category.
+4. Review requested permissions:
+   - `storage`
+   - `*://*.github.com/*`
+5. Submit for review.
+
+## Edge Add-ons Submission
+
+1. Open the Microsoft Edge Add-ons Developer Center.
+2. Upload the same release zip.
+3. Review listing metadata and screenshots.
+4. Submit for certification.
+
+## Notes
+
+- Source control files, `.codex/`, and `.spec-workflow/` are intentionally excluded from the release zip.
+- Interaction rules are stored in GitHub page `localStorage`, so store reviewers should test on actual GitHub pages.

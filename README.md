@@ -43,6 +43,28 @@ GitHub Mentions+ augments GitHub's native @mention autocomplete by:
 3. Click the extension icon to configure your data source
 4. Start using @@mentions on GitHub!
 
+## Release
+
+Build a store-uploadable zip with:
+
+```bash
+bash scripts/build-release-zip.sh
+```
+
+This creates `release/github-mentions-plus-v<version>.zip` using the version in `manifest.json`.
+
+Release notes and store submission steps are in [docs/release-checklist.md](/home/tigeryoo/workspace/github-mentions-plus/docs/release-checklist.md).
+
+### GitHub Actions Release Flow
+
+- Push a version tag like `v1.1.0`
+- GitHub Actions builds the extension zip
+- A GitHub Release is created automatically
+- GitHub-generated release notes are attached
+- The built zip is uploaded to the release as an asset
+
+There is also a manual artifact workflow for pull requests and ad-hoc checks that uploads the generated zip as a workflow artifact.
+
 ## Configuration
 
 ### Data Source Options
