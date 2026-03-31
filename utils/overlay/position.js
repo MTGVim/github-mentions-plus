@@ -28,36 +28,6 @@ overlayPositionRoot.GitHubMentionsOverlay.updateOverlayPosition = async function
   overlay.style.position = 'fixed';
   overlay.style.margin = '0';
 
-  const shouldUseScopedOverlay = overlayPositionRoot.GitHubMentionsOverlay.shouldUseScopedOverlay?.(activeInput);
-
-  if (shouldUseScopedOverlay) {
-    if (overlay.matches(':popover-open')) {
-      try {
-        overlay.hidePopover();
-      } catch (error) {
-        // ignore already-closed popovers
-      }
-    }
-
-    overlay.removeAttribute('popover');
-    overlay.removeAttribute('popover-target');
-  } else {
-    if (!overlay.hasAttribute('popover')) {
-      overlay.setAttribute('popover', 'manual');
-      if (activeInput.id) {
-        overlay.setAttribute('popover-target', activeInput.id);
-      }
-    }
-
-    if (!overlay.matches(':popover-open')) {
-      try {
-        overlay.showPopover();
-      } catch (error) {
-        // ignore already-open popovers
-      }
-    }
-  }
-
   if (typeof floatingUi.computePosition !== 'function') {
     applyFallbackPosition(activeInput, overlay);
     return;

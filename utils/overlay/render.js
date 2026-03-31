@@ -22,10 +22,6 @@ function getScopedOverlayHost(activeInput) {
   return activeInput.closest(SCOPED_OVERLAY_ANCESTOR_SELECTOR);
 }
 
-function shouldUseScopedOverlay(activeInput) {
-  return Boolean(getScopedOverlayHost(activeInput) || isChangesOverlayPath());
-}
-
 function syncOverlayHost(activeInput) {
   const state = overlayRenderRoot.GitHubMentionsOverlay.state;
   const scopedHost = getScopedOverlayHost(activeInput);
@@ -292,14 +288,6 @@ function hideOverlay() {
     return;
   }
 
-  if (state.overlay.matches(':popover-open')) {
-    try {
-      state.overlay.hidePopover();
-    } catch (error) {
-      // ignore already-closed popovers
-    }
-  }
-
   state.overlay.style.display = 'none';
   state.selectedIndex = 0;
   state.overlayItems = [];
@@ -307,7 +295,7 @@ function hideOverlay() {
 
 function isOverlayVisible() {
   const state = overlayRenderRoot.GitHubMentionsOverlay.state;
-  return Boolean(state.overlay && (state.overlay.style.display !== 'none' || state.overlay.matches(':popover-open')));
+  return Boolean(state.overlay && state.overlay.style.display !== 'none');
 }
 
 function removeOverlay() {
@@ -335,7 +323,6 @@ function getSelectedItem() {
 overlayRenderRoot.GitHubMentionsOverlay.getThemeColors = getThemeColors;
 overlayRenderRoot.GitHubMentionsOverlay.getScopedOverlayHost = getScopedOverlayHost;
 overlayRenderRoot.GitHubMentionsOverlay.isChangesOverlayPath = isChangesOverlayPath;
-overlayRenderRoot.GitHubMentionsOverlay.shouldUseScopedOverlay = shouldUseScopedOverlay;
 overlayRenderRoot.GitHubMentionsOverlay.getSelectedBgColor = getSelectedBgColor;
 overlayRenderRoot.GitHubMentionsOverlay.updateSelection = updateSelection;
 overlayRenderRoot.GitHubMentionsOverlay.createOverlay = createOverlay;
@@ -349,7 +336,6 @@ overlayRenderRoot.GitHubMentionsOverlay.getSelectedItem = getSelectedItem;
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     getScopedOverlayHost,
-    isChangesOverlayPath,
-    shouldUseScopedOverlay
+    isChangesOverlayPath
   };
 }

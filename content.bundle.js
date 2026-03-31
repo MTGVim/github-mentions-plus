@@ -340,9 +340,6 @@
         }
         return activeInput.closest(SCOPED_OVERLAY_ANCESTOR_SELECTOR);
       }
-      function shouldUseScopedOverlay(activeInput) {
-        return Boolean(getScopedOverlayHost(activeInput) || isChangesOverlayPath());
-      }
       function syncOverlayHost(activeInput) {
         const state = overlayRenderRoot.GitHubMentionsOverlay.state;
         const scopedHost = getScopedOverlayHost(activeInput);
@@ -582,19 +579,13 @@
         if (!state.overlay) {
           return;
         }
-        if (state.overlay.matches(":popover-open")) {
-          try {
-            state.overlay.hidePopover();
-          } catch (error) {
-          }
-        }
         state.overlay.style.display = "none";
         state.selectedIndex = 0;
         state.overlayItems = [];
       }
       function isOverlayVisible() {
         const state = overlayRenderRoot.GitHubMentionsOverlay.state;
-        return Boolean(state.overlay && (state.overlay.style.display !== "none" || state.overlay.matches(":popover-open")));
+        return Boolean(state.overlay && state.overlay.style.display !== "none");
       }
       function removeOverlay() {
         const state = overlayRenderRoot.GitHubMentionsOverlay.state;
@@ -618,7 +609,6 @@
       overlayRenderRoot.GitHubMentionsOverlay.getThemeColors = getThemeColors;
       overlayRenderRoot.GitHubMentionsOverlay.getScopedOverlayHost = getScopedOverlayHost;
       overlayRenderRoot.GitHubMentionsOverlay.isChangesOverlayPath = isChangesOverlayPath;
-      overlayRenderRoot.GitHubMentionsOverlay.shouldUseScopedOverlay = shouldUseScopedOverlay;
       overlayRenderRoot.GitHubMentionsOverlay.getSelectedBgColor = getSelectedBgColor;
       overlayRenderRoot.GitHubMentionsOverlay.updateSelection = updateSelection;
       overlayRenderRoot.GitHubMentionsOverlay.createOverlay = createOverlay;
@@ -631,8 +621,7 @@
       if (typeof module !== "undefined" && module.exports) {
         module.exports = {
           getScopedOverlayHost,
-          isChangesOverlayPath,
-          shouldUseScopedOverlay
+          isChangesOverlayPath
         };
       }
     }
@@ -2429,30 +2418,6 @@
     overlay.style.borderRadius = "0.75rem";
     overlay.style.position = "fixed";
     overlay.style.margin = "0";
-    const shouldUseScopedOverlay = overlayPositionRoot.GitHubMentionsOverlay.shouldUseScopedOverlay?.(activeInput);
-    if (shouldUseScopedOverlay) {
-      if (overlay.matches(":popover-open")) {
-        try {
-          overlay.hidePopover();
-        } catch (error) {
-        }
-      }
-      overlay.removeAttribute("popover");
-      overlay.removeAttribute("popover-target");
-    } else {
-      if (!overlay.hasAttribute("popover")) {
-        overlay.setAttribute("popover", "manual");
-        if (activeInput.id) {
-          overlay.setAttribute("popover-target", activeInput.id);
-        }
-      }
-      if (!overlay.matches(":popover-open")) {
-        try {
-          overlay.showPopover();
-        } catch (error) {
-        }
-      }
-    }
     if (typeof floatingUi.computePosition !== "function") {
       applyFallbackPosition(activeInput, overlay);
       return;

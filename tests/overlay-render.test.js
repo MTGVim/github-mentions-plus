@@ -3,8 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   getScopedOverlayHost,
-  isChangesOverlayPath,
-  shouldUseScopedOverlay
+  isChangesOverlayPath
 } = require('../utils/overlay/render.js');
 
 function createNode(tagName, parentNode = null, attributes = {}) {
@@ -74,15 +73,8 @@ test('isChangesOverlayPath matches pull changes urls', () => {
   assert.equal(isChangesOverlayPath('/pull/123/files'), false);
 });
 
-test('shouldUseScopedOverlay falls back to the pathname heuristic', () => {
+test('getScopedOverlayHost returns null without a matching ancestor', () => {
   const textarea = createNode('TEXTAREA');
-  const originalLocation = globalThis.location;
 
-  globalThis.location = { pathname: '/pull/123/changes?diff=split' };
-
-  try {
-    assert.equal(shouldUseScopedOverlay(textarea), true);
-  } finally {
-    globalThis.location = originalLocation;
-  }
+  assert.equal(getScopedOverlayHost(textarea), null);
 });
