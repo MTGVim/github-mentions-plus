@@ -1,6 +1,48 @@
 const overlayRenderRoot = typeof window !== 'undefined' ? window : globalThis;
 overlayRenderRoot.GitHubMentionsOverlay = overlayRenderRoot.GitHubMentionsOverlay || {};
 
+const SCOPED_OVERLAY_ANCESTOR_SELECTOR = [
+  '[role="dialog"]',
+  '[popover]',
+  'details[open]',
+  '[data-testid="popover"]',
+  '[data-testid="anchor-panel"]',
+  '[data-testid="anchored-position"]'
+].join(', ');
+
+function isChangesOverlayPath(pathname = overlayRenderRoot.location?.pathname || '') {
+  return /\/pull\/.+\/changes.*$/.test(pathname);
+}
+
+function getScopedOverlayHost(activeInput) {
+  if (!activeInput?.closest) {
+    return null;
+  }
+
+  return activeInput.closest(SCOPED_OVERLAY_ANCESTOR_SELECTOR);
+}
+
+function shouldUseScopedOverlay(activeInput) {
+  return Boolean(getScopedOverlayHost(activeInput) || isChangesOverlayPath());
+}
+
+function syncOverlayHost(activeInput) {
+  const state = overlayRenderRoot.GitHubMentionsOverlay.state;
+  const scopedHost = getScopedOverlayHost(activeInput);
+  const nextHost = scopedHost || document.body;
+
+  if (!state.overlay) {
+    return nextHost;
+  }
+
+  if (state.overlay.parentNode !== nextHost) {
+    nextHost.appendChild(state.overlay);
+  }
+
+  state.overlayHost = nextHost;
+  return nextHost;
+}
+
 function getThemeColors() {
   const isDarkMode = overlayRenderRoot.matchMedia && overlayRenderRoot.matchMedia('(prefers-color-scheme: dark)').matches;
   return {
@@ -184,9 +226,10 @@ function createItem(user, index, onSelect, colors) {
   return item;
 }
 
-function createOverlay() {
+function createOverlay(activeInput) {
   const state = overlayRenderRoot.GitHubMentionsOverlay.state;
   if (state.overlay) {
+    syncOverlayHost(activeInput);
     return state.overlay;
   }
 
@@ -210,18 +253,24 @@ function createOverlay() {
     overflow: hidden;
     box-sizing: content-box;
   `;
-  document.body.appendChild(state.overlay);
+  ['pointerdown', 'mousedown', 'click'].forEach((eventName) => {
+    state.overlay.addEventListener(eventName, (event) => {
+      event.stopPropagation();
+    });
+  });
+  syncOverlayHost(activeInput);
   return state.overlay;
 }
 
 function showOverlay(users, onSelect, activeInput) {
   const state = overlayRenderRoot.GitHubMentionsOverlay.state;
-  if (!state.overlay || !Array.isArray(users) || users.length === 0) {
+  const overlay = createOverlay(activeInput);
+  if (!overlay || !Array.isArray(users) || users.length === 0) {
     return;
   }
 
   const colors = getThemeColors();
-  state.overlay.innerHTML = '';
+  overlay.innerHTML = '';
   state.selectedIndex = 0;
   state.currentSelectedIndex = 0;
   state.overlayItems = [];
@@ -230,10 +279,10 @@ function showOverlay(users, onSelect, activeInput) {
   users.slice(0, 4).forEach((user, index) => {
     const item = createItem(user, index, onSelect, colors);
     state.overlayItems.push(item);
-    state.overlay.appendChild(item);
+    overlay.appendChild(item);
   });
 
-  state.overlay.style.display = 'block';
+  overlay.style.display = 'block';
   overlayRenderRoot.GitHubMentionsOverlay.updateOverlayPosition?.(activeInput);
 }
 
@@ -266,6 +315,7 @@ function removeOverlay() {
   if (state.overlay?.parentNode) {
     state.overlay.parentNode.removeChild(state.overlay);
     state.overlay = null;
+    state.overlayHost = null;
     state.lastGoodPosition = null;
   }
 }
@@ -283,6 +333,9 @@ function getSelectedItem() {
 }
 
 overlayRenderRoot.GitHubMentionsOverlay.getThemeColors = getThemeColors;
+overlayRenderRoot.GitHubMentionsOverlay.getScopedOverlayHost = getScopedOverlayHost;
+overlayRenderRoot.GitHubMentionsOverlay.isChangesOverlayPath = isChangesOverlayPath;
+overlayRenderRoot.GitHubMentionsOverlay.shouldUseScopedOverlay = shouldUseScopedOverlay;
 overlayRenderRoot.GitHubMentionsOverlay.getSelectedBgColor = getSelectedBgColor;
 overlayRenderRoot.GitHubMentionsOverlay.updateSelection = updateSelection;
 overlayRenderRoot.GitHubMentionsOverlay.createOverlay = createOverlay;
@@ -292,3 +345,11 @@ overlayRenderRoot.GitHubMentionsOverlay.isOverlayVisible = isOverlayVisible;
 overlayRenderRoot.GitHubMentionsOverlay.removeOverlay = removeOverlay;
 overlayRenderRoot.GitHubMentionsOverlay.getOverlay = getOverlay;
 overlayRenderRoot.GitHubMentionsOverlay.getSelectedItem = getSelectedItem;
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    getScopedOverlayHost,
+    isChangesOverlayPath,
+    shouldUseScopedOverlay
+  };
+}

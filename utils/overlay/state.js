@@ -3,6 +3,7 @@ overlayStateRoot.GitHubMentionsOverlay = overlayStateRoot.GitHubMentionsOverlay 
 
 overlayStateRoot.GitHubMentionsOverlay.state = {
   overlay: null,
+  overlayHost: null,
   lastGoodPosition: null,
   positionRequestId: 0,
   selectedIndex: 0,
