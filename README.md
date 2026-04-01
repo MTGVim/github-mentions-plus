@@ -5,7 +5,11 @@
 [![All Contributors](https://img.shields.io/badge/all_contributors-2-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
+<img width="1280" height="800" alt="image" src="https://github.com/user-attachments/assets/6a7b134c-6c7a-4e23-84c1-4a4ab95c9ce1" />
+
 A browser extension that enhances GitHub's native @mention autocomplete by adding custom user suggestions from configurable endpoints or direct JSON input.
+
+[Chrome Web Store](https://chromewebstore.google.com/detail/github-mentions+/kdbkmpmdakfiiaoennnfkhaidakhedfh)
 
 ## Problem Statement
 
