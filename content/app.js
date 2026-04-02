@@ -7,7 +7,8 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
     mentionStartPos: null,
     isInitialized: false,
     settings: null,
-    cachedUsers: []
+    cachedUsers: [],
+    inputObserver: null
   };
 
   function getApi() {
@@ -230,6 +231,46 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
     }
   }
 
+  function nodeContainsSupportedInput(node) {
+    if (!node || node.nodeType !== 1) {
+      return false;
+    }
+
+    if (isSupportedInput(node)) {
+      return true;
+    }
+
+    return Boolean(node.querySelector?.('textarea, [contenteditable="true"]'));
+  }
+
+  function shouldRescanForMutations(mutations) {
+    return mutations.some((mutation) => {
+      if (mutation.type !== 'childList') {
+        return false;
+      }
+
+      return Array.from(mutation.addedNodes || []).some(nodeContainsSupportedInput)
+        || Array.from(mutation.removedNodes || []).some(nodeContainsSupportedInput);
+    });
+  }
+
+  function startInputObserver() {
+    if (state.inputObserver || typeof MutationObserver !== 'function' || !document.body) {
+      return;
+    }
+
+    state.inputObserver = new MutationObserver((mutations) => {
+      if (shouldRescanForMutations(mutations)) {
+        scanInputs();
+      }
+    });
+
+    state.inputObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
   function handleFocusIn(event) {
     const nextInput = event.target;
     if (!isSupportedInput(nextInput)) {
@@ -264,6 +305,10 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
 
   function cleanup() {
     try {
+      if (state.inputObserver) {
+        state.inputObserver.disconnect();
+        state.inputObserver = null;
+      }
       getApi().dom.removeOverlay();
       const overlay = document.getElementById('github-mentions-overlay');
       if (overlay && overlay.parentNode) {
@@ -344,7 +389,7 @@ contentAppRoot.GitHubMentionsContent.createApp = function() {
       dom.createOverlay();
       state.cachedUsers = await storage.getCachedUsers();
       scanInputs();
-      setInterval(scanInputs, 1e3 / 30);
+      startInputObserver();
       state.isInitialized = true;
     } catch (error) {
       // ignore initialization failures
