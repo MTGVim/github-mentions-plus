@@ -109,6 +109,78 @@ test('executeCommand inserts curated LGTM fallback when runtime request fails', 
   }
 });
 
+test('executeCommand inserts an LGTM placeholder immediately for textarea inputs', async () => {
+  let resolver;
+  globalThis.chrome = {
+    runtime: {
+      lastError: null,
+      sendMessage(_message, callback) {
+        resolver = callback;
+      }
+    }
+  };
+
+  const events = [];
+  const input = {
+    value: 'Please check @!lgtmrand',
+    selectionStart: 'Please check @!lgtmrand'.length,
+    selectionEnd: 'Please check @!lgtmrand'.length,
+    dispatchEvent(event) {
+      events.push(event.type);
+    },
+    matches(selector) {
+      return selector === 'textarea';
+    }
+  };
+
+  const success = await executeCommand('lgtmrand', input, {});
+
+  assert.equal(success, true);
+  assert.match(input.value, /^Please check <!-- GHMP_LGTM:[a-z0-9-]+ -->$/);
+  assert.equal(input.selectionStart, input.value.length);
+  assert.equal(input.selectionEnd, input.value.length);
+  assert.deepEqual(events, ['input']);
+
+  resolver({ success: true, imageUrl: 'https://example.com/lgtm.gif' });
+});
+
+test('executeCommand replaces only the matching LGTM placeholder after async resolution', async () => {
+  let resolver;
+  globalThis.chrome = {
+    runtime: {
+      lastError: null,
+      sendMessage(_message, callback) {
+        resolver = callback;
+      }
+    }
+  };
+
+  const input = {
+    value: 'Please check @!lgtmrand',
+    selectionStart: 'Please check @!lgtmrand'.length,
+    selectionEnd: 'Please check @!lgtmrand'.length,
+    dispatchEvent() {},
+    matches(selector) {
+      return selector === 'textarea';
+    }
+  };
+
+  await executeCommand('lgtmrand', input, {});
+  const placeholderValue = input.value;
+  input.value = `${placeholderValue} and keep typing`;
+  input.selectionStart = input.selectionEnd = input.value.length;
+
+  resolver({ success: true, imageUrl: 'https://example.com/lgtm.gif' });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(
+    input.value,
+    'Please check ![LGTM](https://example.com/lgtm.gif) and keep typing'
+  );
+  assert.equal(input.selectionStart, input.value.length);
+  assert.equal(input.selectionEnd, input.value.length);
+});
+
 function createNavigationEnvironment(items) {
   globalThis.GitHubMentionsOverlay = {
     state: {

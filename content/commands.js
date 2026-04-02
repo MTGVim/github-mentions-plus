@@ -89,9 +89,102 @@ function applyCommandTemplate(template, date = new Date()) {
     .replace(/\$\{time\}/g, date.toLocaleTimeString());
 }
 
+function createLgtmPlaceholder() {
+  const token = `ghmp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return `<!-- GHMP_LGTM:${token} -->`;
+}
+
+function dispatchInputEvent(input) {
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function replaceTextRange(input, start, end, replacement) {
+  const originalValue = input.value;
+  const before = originalValue.slice(0, start);
+  const after = originalValue.slice(end);
+  const delta = replacement.length - (end - start);
+  const selectionStart = input.selectionStart;
+  const selectionEnd = input.selectionEnd;
+
+  input.value = before + replacement + after;
+
+  if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+    let nextSelectionStart = selectionStart;
+    let nextSelectionEnd = selectionEnd;
+
+    if (selectionStart > end) {
+      nextSelectionStart += delta;
+    } else if (selectionStart >= start) {
+      nextSelectionStart = start + replacement.length;
+    }
+
+    if (selectionEnd > end) {
+      nextSelectionEnd += delta;
+    } else if (selectionEnd >= start) {
+      nextSelectionEnd = start + replacement.length;
+    }
+
+    input.selectionStart = nextSelectionStart;
+    input.selectionEnd = nextSelectionEnd;
+  }
+
+  dispatchInputEvent(input);
+}
+
+function insertTextareaPlaceholder(input, commandStart, commandEnd, placeholder) {
+  replaceTextRange(input, commandStart, commandEnd, placeholder);
+}
+
+function replaceTextareaPlaceholder(input, placeholder, replacement) {
+  if (!input?.matches?.('textarea')) {
+    return false;
+  }
+
+  const index = input.value.indexOf(placeholder);
+  if (index === -1) {
+    return false;
+  }
+
+  replaceTextRange(input, index, index + placeholder.length, replacement);
+  return true;
+}
+
+function resolveLgtmPlaceholderAsync(input, placeholder) {
+  resolveLgtmCommandResult()
+    .then((lgtmResult) => {
+      if (!lgtmResult?.success || !lgtmResult.imageUrl) {
+        return;
+      }
+
+      replaceTextareaPlaceholder(input, placeholder, `![LGTM](${lgtmResult.imageUrl})`);
+    })
+    .catch((error) => {
+      console.error('[GitHub Mentions+] LGTM placeholder replacement error:', error);
+    });
+}
+
 async function executeCommand(command, input, settings) {
   try {
     let result = '';
+
+    const cursor = input.selectionStart;
+    const text = input.value;
+    const beforeCursor = text.substring(0, cursor);
+    const afterCursor = text.substring(cursor);
+    const commandMatch = beforeCursor.match(/@!([a-zA-Z0-9-_]*)$/);
+
+    if (!commandMatch) {
+      return false;
+    }
+
+    const commandStart = cursor - commandMatch[0].length;
+
+    if (command === 'lgtmrand' && input.matches?.('textarea')) {
+      const placeholder = createLgtmPlaceholder();
+      insertTextareaPlaceholder(input, commandStart, cursor, placeholder);
+      resolveLgtmPlaceholderAsync(input, placeholder);
+      return true;
+    }
 
     if (command === 'lgtmrand') {
       const lgtmResult = await resolveLgtmCommandResult();
@@ -115,20 +208,9 @@ async function executeCommand(command, input, settings) {
       return false;
     }
 
-    const cursor = input.selectionStart;
-    const text = input.value;
-    const beforeCursor = text.substring(0, cursor);
-    const afterCursor = text.substring(cursor);
-    const commandMatch = beforeCursor.match(/@!([a-zA-Z0-9-_]*)$/);
-
-    if (!commandMatch) {
-      return false;
-    }
-
-    const commandStart = cursor - commandMatch[0].length;
     input.value = text.substring(0, commandStart) + result + afterCursor;
     input.selectionStart = input.selectionEnd = commandStart + result.length;
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    dispatchInputEvent(input);
     return true;
   } catch (error) {
     console.error('[GitHub Mentions+] Command execution error:', error);
@@ -150,6 +232,8 @@ if (typeof module !== 'undefined' && module.exports) {
     pickRandomLgtmGif,
     requestLgtmFromBackground,
     resolveLgtmCommandResult,
-    executeCommand
+    executeCommand,
+    createLgtmPlaceholder,
+    replaceTextareaPlaceholder
   };
 }
