@@ -5,7 +5,7 @@
     "build": "node scripts/build.js",
     "test": "node --test tests/*.test.js",
     "release:zip": "bash scripts/build-release-zip.sh",
-    "release:version": "bash scripts/release-version.sh"
+    "release:tag": "bash scripts/release-tag.sh"
   },
   "devDependencies": {
     "esbuild": "^0.27.4"

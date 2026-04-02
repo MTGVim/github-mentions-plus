@@ -7,8 +7,8 @@ cd "$ROOT_DIR"
 
 VERSION="${1:-}"
 if [[ -z "$VERSION" ]]; then
-  echo "Usage: bash scripts/release-version.sh <version>" >&2
-  echo "Example: bash scripts/release-version.sh 1.1.0" >&2
+  echo "Usage: bash scripts/release-tag.sh <version>" >&2
+  echo "Example: bash scripts/release-tag.sh 1.1.0" >&2
   exit 1
 fi
 

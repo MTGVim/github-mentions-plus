@@ -63,7 +63,7 @@ This creates `release/github-mentions-plus-v<version>.zip` using the version in 
 Cut a release version, create the matching tag, and push both with:
 
 ```bash
-yarn release:version 1.1.0
+yarn release:tag 1.1.0
 ```
 
 This will:

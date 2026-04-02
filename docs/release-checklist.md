@@ -10,20 +10,28 @@
 
 ## GitHub Release Automation
 
-1. Run `yarn release:version 1.1.0`.
+1. Run `yarn release:tag 1.1.0`.
 2. The script will:
    - update `manifest.json`
    - commit the version bump
    - create tag `v1.1.0`
    - push `main`
    - push `v1.1.0`
-4. The `Release Extension` workflow will:
+3. The standard tag-driven `Release Extension` workflow will:
    - validate that `manifest.json` version matches the tag
    - build `release/github-mentions-plus-v<version>.zip`
    - create a GitHub Release
    - generate release notes automatically
    - upload the zip as a release asset
-5. For non-release verification, use the `Build Release Artifact` workflow or PR workflow artifact.
+4. For non-release verification, use the `Build Release Artifact` workflow or PR workflow artifact.
+
+## Manual Release Extension
+
+1. Open the `Release Extension` workflow in GitHub Actions.
+2. Run it manually with `workflow_dispatch`.
+3. Enable the `submit_to_chrome_web_store` checkbox when you want the workflow to submit the build to the Chrome Web Store through the latest V2 API.
+4. Keep the checkbox disabled when you only want the GitHub Release path.
+5. The manual run still validates the manifest version, builds the release zip, and publishes the GitHub Release before any optional Chrome Web Store submission.
 
 ## Smoke Test
 
@@ -36,13 +44,20 @@
 
 ## Chrome Web Store Submission
 
-1. Open the Chrome Web Store Developer Dashboard.
-2. Upload `release/github-mentions-plus-v<version>.zip`.
-3. Update listing text, screenshots, and category.
-4. Review requested permissions:
+1. Make sure the listing, privacy details, screenshots, and store metadata are already configured in the Chrome Web Store dashboard before you submit a build.
+2. Required GitHub Actions secrets:
+   - `CWS_EXTENSION_ID`
+   - `CWS_PUBLISHER_ID`
+   - `CWS_CLIENT_ID`
+   - `CWS_CLIENT_SECRET`
+   - `CWS_REFRESH_TOKEN`
+3. Open the Chrome Web Store Developer Dashboard.
+4. Upload `release/github-mentions-plus-v<version>.zip`.
+5. Update listing text, screenshots, and category if needed.
+6. Review requested permissions:
    - `storage`
    - `*://*.github.com/*`
-5. Submit for review.
+7. Submit for review.
 
 ## Edge Add-ons Submission
 
