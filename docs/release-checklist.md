@@ -10,20 +10,24 @@
 
 ## GitHub Release Automation
 
-1. Run `yarn release:tag 1.1.0`.
+1. Run `yarn release:tag`.
 2. The script will:
+   - fetch the latest tags from `origin`
+   - show the latest semantic version tag
+   - prompt for the next version in `v1.1.0` or `1.1.0` form
+   - reject versions that are not newer than the latest git tag
    - update `manifest.json`
-   - commit the version bump
-   - create tag `v1.1.0`
+   - commit the version bump when needed
    - push `main`
-   - push `v1.1.0`
+   - create and push `v1.1.0`
 3. The standard tag-driven `Release Extension` workflow will:
    - validate that `manifest.json` version matches the tag
    - build `release/github-mentions-plus-v<version>.zip`
    - create a GitHub Release
    - generate release notes automatically
    - upload the zip as a release asset
-4. For non-release verification, use the `Build Release Artifact` workflow or PR workflow artifact.
+4. To preview the planned steps without changing anything, run `yarn release:tag --dry-run`.
+5. For non-release verification, use the `Build Release Artifact` workflow or PR workflow artifact.
 
 ## Manual Release Extension
 

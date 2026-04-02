@@ -63,15 +63,23 @@ This creates `release/github-mentions-plus-v<version>.zip` using the version in 
 Cut a release version, create the matching tag, and push both with:
 
 ```bash
-yarn release:tag 1.1.0
+yarn release:tag
 ```
 
 This will:
+- fetch the latest tags from `origin`
+- show the current latest semantic version tag
+- prompt for the next tag in `v1.1.0` or `1.1.0` form
 - update `manifest.json`
-- commit the version bump
-- create tag `v1.1.0`
+- commit the version bump when needed
 - push `main`
-- push the tag so the release workflow runs
+- create and push the tag so the release workflow runs
+
+If you want to preview the planned changes without touching git or `manifest.json`, run:
+
+```bash
+yarn release:tag --dry-run
+```
 
 Release notes and store submission steps are in [docs/release-checklist.md](/home/tigeryoo/workspace/github-mentions-plus/docs/release-checklist.md).
 
