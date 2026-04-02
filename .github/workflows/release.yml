@@ -10,11 +10,6 @@ on:
         description: 'Existing git tag to release, for example v1.1.0'
         required: true
         type: string
-      submit_to_chrome_web_store:
-        description: 'Upload the built zip to the Chrome Web Store and submit it for review'
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write
@@ -22,8 +17,6 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    env:
-      SHOULD_SUBMIT_TO_CWS: ${{ github.event_name == 'workflow_dispatch' && inputs.submit_to_chrome_web_store }}
 
     steps:
       - name: Checkout
@@ -78,140 +71,3 @@ jobs:
           tag_name: ${{ env.TAG_NAME }}
           generate_release_notes: true
           files: release/*.zip
-
-      - name: Exchange Chrome Web Store access token
-        if: ${{ env.SHOULD_SUBMIT_TO_CWS == 'true' }}
-        shell: bash
-        env:
-          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
-          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
-          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${CWS_CLIENT_ID:-}" || -z "${CWS_CLIENT_SECRET:-}" || -z "${CWS_REFRESH_TOKEN:-}" ]]; then
-            echo "Missing one or more Chrome Web Store OAuth secrets: CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN"
-            exit 1
-          fi
-
-          echo "Requesting a Chrome Web Store access token"
-          TOKEN_RESPONSE="$(
-            curl --fail --silent --show-error \
-              -X POST 'https://oauth2.googleapis.com/token' \
-              -H 'Content-Type: application/x-www-form-urlencoded' \
-              --data-urlencode "client_id=${CWS_CLIENT_ID}" \
-              --data-urlencode "client_secret=${CWS_CLIENT_SECRET}" \
-              --data-urlencode "refresh_token=${CWS_REFRESH_TOKEN}" \
-              --data-urlencode 'grant_type=refresh_token'
-          )"
-
-          CWS_ACCESS_TOKEN="$(
-            node -e 'const fs = require("fs"); const payload = JSON.parse(fs.readFileSync(0, "utf8")); const token = payload.access_token; if (!token) { console.error("Token response did not include access_token"); process.exit(1); } process.stdout.write(token);' <<<"$TOKEN_RESPONSE"
-          )"
-
-          echo "::add-mask::${CWS_ACCESS_TOKEN}"
-          echo "CWS_ACCESS_TOKEN=${CWS_ACCESS_TOKEN}" >> "$GITHUB_ENV"
-          echo "Chrome Web Store access token cached for later steps"
-
-      - name: Upload extension to Chrome Web Store
-        if: ${{ env.SHOULD_SUBMIT_TO_CWS == 'true' }}
-        shell: bash
-        env:
-          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
-          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${CWS_EXTENSION_ID:-}" ]]; then
-            echo "Missing Chrome Web Store secret: CWS_EXTENSION_ID"
-            exit 1
-          fi
-          if [[ -z "${CWS_PUBLISHER_ID:-}" ]]; then
-            echo "Missing Chrome Web Store secret: CWS_PUBLISHER_ID"
-            exit 1
-          fi
-          if [[ -z "${CWS_ACCESS_TOKEN:-}" ]]; then
-            echo "Missing Chrome Web Store access token"
-            exit 1
-          fi
-
-          mapfile -t ZIP_FILES < <(find release -maxdepth 1 -type f -name '*.zip' | sort)
-          if [[ "${#ZIP_FILES[@]}" -eq 0 ]]; then
-            echo "No release zip found in release/"
-            exit 1
-          fi
-          if [[ "${#ZIP_FILES[@]}" -gt 1 ]]; then
-            echo "Expected exactly one release zip, found ${#ZIP_FILES[@]}"
-            printf '%s\n' "${ZIP_FILES[@]}"
-            exit 1
-          fi
-          ZIP_PATH="${ZIP_FILES[0]}"
-
-          echo "Uploading ${ZIP_PATH} to Chrome Web Store item ${CWS_EXTENSION_ID} under publisher ${CWS_PUBLISHER_ID}"
-          UPLOAD_BODY_FILE="$(mktemp)"
-          UPLOAD_HTTP_STATUS="$(
-            curl --silent --show-error \
-              -X POST "https://chromewebstore.googleapis.com/upload/v2/publishers/${CWS_PUBLISHER_ID}/items/${CWS_EXTENSION_ID}:upload" \
-              -H "Authorization: Bearer ${CWS_ACCESS_TOKEN}" \
-              -H 'Content-Type: application/zip' \
-              --data-binary @"${ZIP_PATH}" \
-              --output "${UPLOAD_BODY_FILE}" \
-              --write-out '%{http_code}'
-          )"
-
-          UPLOAD_RESPONSE="$(cat "${UPLOAD_BODY_FILE}")"
-          rm -f "${UPLOAD_BODY_FILE}"
-
-          if [[ ! "$UPLOAD_HTTP_STATUS" =~ ^2 ]]; then
-            echo "Chrome Web Store upload failed with HTTP ${UPLOAD_HTTP_STATUS}"
-            if [[ -n "${UPLOAD_RESPONSE:-}" ]]; then
-              node -e 'const fs = require("fs"); const raw = fs.readFileSync(0, "utf8").trim(); if (!raw) { process.exit(0); } try { console.log(JSON.stringify(JSON.parse(raw), null, 2)); } catch { console.log(raw); }' <<<"$UPLOAD_RESPONSE"
-            fi
-            exit 1
-          fi
-
-          echo "Chrome Web Store upload response:"
-          node -e 'const fs = require("fs"); const raw = fs.readFileSync(0, "utf8").trim(); if (!raw) { console.log("No response body returned"); process.exit(0); } try { console.log(JSON.stringify(JSON.parse(raw), null, 2)); } catch { console.log(raw); }' <<<"$UPLOAD_RESPONSE"
-
-      - name: Publish Chrome Web Store item
-        if: ${{ env.SHOULD_SUBMIT_TO_CWS == 'true' }}
-        shell: bash
-        env:
-          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
-          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${CWS_EXTENSION_ID:-}" ]]; then
-            echo "Missing Chrome Web Store secret: CWS_EXTENSION_ID"
-            exit 1
-          fi
-          if [[ -z "${CWS_PUBLISHER_ID:-}" ]]; then
-            echo "Missing Chrome Web Store secret: CWS_PUBLISHER_ID"
-            exit 1
-          fi
-          if [[ -z "${CWS_ACCESS_TOKEN:-}" ]]; then
-            echo "Missing Chrome Web Store access token"
-            exit 1
-          fi
-
-          echo "Submitting Chrome Web Store item ${CWS_EXTENSION_ID} under publisher ${CWS_PUBLISHER_ID} for review"
-          PUBLISH_BODY_FILE="$(mktemp)"
-          PUBLISH_HTTP_STATUS="$(
-            curl --silent --show-error \
-              -X POST "https://chromewebstore.googleapis.com/v2/publishers/${CWS_PUBLISHER_ID}/items/${CWS_EXTENSION_ID}:publish" \
-              -H "Authorization: Bearer ${CWS_ACCESS_TOKEN}" \
-              --output "${PUBLISH_BODY_FILE}" \
-              --write-out '%{http_code}'
-          )"
-
-          PUBLISH_RESPONSE="$(cat "${PUBLISH_BODY_FILE}")"
-          rm -f "${PUBLISH_BODY_FILE}"
-
-          if [[ ! "$PUBLISH_HTTP_STATUS" =~ ^2 ]]; then
-            echo "Chrome Web Store publish failed with HTTP ${PUBLISH_HTTP_STATUS}"
-            if [[ -n "${PUBLISH_RESPONSE:-}" ]]; then
-              node -e 'const fs = require("fs"); const raw = fs.readFileSync(0, "utf8").trim(); if (!raw) { process.exit(0); } try { console.log(JSON.stringify(JSON.parse(raw), null, 2)); } catch { console.log(raw); }' <<<"$PUBLISH_RESPONSE"
-            fi
-            exit 1
-          fi
-
-          echo "Chrome Web Store publish response:"
-          node -e 'const fs = require("fs"); const raw = fs.readFileSync(0, "utf8").trim(); if (!raw) { console.log("No response body returned"); process.exit(0); } try { console.log(JSON.stringify(JSON.parse(raw), null, 2)); } catch { console.log(raw); }' <<<"$PUBLISH_RESPONSE"

@@ -33,9 +33,8 @@
 
 1. Open the `Release Extension` workflow in GitHub Actions.
 2. Run it manually with `workflow_dispatch`.
-3. Enable the `submit_to_chrome_web_store` checkbox when you want the workflow to submit the build to the Chrome Web Store through the latest V2 API.
-4. Keep the checkbox disabled when you only want the GitHub Release path.
-5. The manual run still validates the manifest version, builds the release zip, and publishes the GitHub Release before any optional Chrome Web Store submission.
+3. Enter the existing tag you want to package, for example `v1.1.0`.
+4. The manual run validates the manifest version, builds the release zip, and publishes the GitHub Release asset.
 
 ## Smoke Test
 
@@ -48,20 +47,13 @@
 
 ## Chrome Web Store Submission
 
-1. Make sure the listing, privacy details, screenshots, and store metadata are already configured in the Chrome Web Store dashboard before you submit a build.
-2. Required GitHub Actions secrets:
-   - `CWS_EXTENSION_ID`
-   - `CWS_PUBLISHER_ID`
-   - `CWS_CLIENT_ID`
-   - `CWS_CLIENT_SECRET`
-   - `CWS_REFRESH_TOKEN`
-3. Open the Chrome Web Store Developer Dashboard.
-4. Upload `release/github-mentions-plus-v<version>.zip`.
-5. Update listing text, screenshots, and category if needed.
-6. Review requested permissions:
+1. Open the Chrome Web Store Developer Dashboard.
+2. Upload `release/github-mentions-plus-v<version>.zip`.
+3. Update listing text, screenshots, and category if needed.
+4. Review requested permissions:
    - `storage`
    - `*://*.github.com/*`
-7. Submit for review.
+5. Submit for review.
 
 ## Edge Add-ons Submission
 
