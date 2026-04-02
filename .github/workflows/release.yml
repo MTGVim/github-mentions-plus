@@ -10,6 +10,11 @@ on:
         description: 'Existing git tag to release, for example v1.1.0'
         required: true
         type: string
+      submit_to_chrome_web_store:
+        description: 'Upload the built zip to the Chrome Web Store and submit it for review'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -17,6 +22,8 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    env:
+      SHOULD_SUBMIT_TO_CWS: ${{ github.event_name == 'workflow_dispatch' && inputs.submit_to_chrome_web_store }}
 
     steps:
       - name: Checkout
