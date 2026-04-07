@@ -61,6 +61,10 @@ function getBuiltInCommands() {
   ];
 }
 
+function sortCommandsAlphabetically(commands) {
+  return [...commands].sort((left, right) => left.command.localeCompare(right.command));
+}
+
 function buildAvailableCommands(customCommands) {
   const safeCommands = customCommands && typeof customCommands === 'object'
     ? customCommands
@@ -79,7 +83,10 @@ function buildAvailableCommands(customCommands) {
     };
   });
 
-  return [...getBuiltInCommands(), ...userCommands].slice(0, 10);
+  return [
+    ...sortCommandsAlphabetically(userCommands),
+    ...sortCommandsAlphabetically(getBuiltInCommands())
+  ].slice(0, 10);
 }
 
 function applyCommandTemplate(template, date = new Date()) {

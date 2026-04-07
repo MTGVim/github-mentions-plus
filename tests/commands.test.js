@@ -11,20 +11,38 @@ const {
 
 const { handleKeyNavigation } = require('../utils/overlay/navigation.js');
 
-test('buildAvailableCommands includes built-ins and custom command metadata', () => {
+test('buildAvailableCommands lists custom commands first in alphabetical order, then built-ins', () => {
   const commands = buildAvailableCommands({
+    zebra: {
+      content: 'Last one',
+      emoji: '🦓'
+    },
     review: {
       content: 'Ready at ${timestamp}',
       emoji: '✅'
+    },
+    alpha: {
+      content: 'Alpha note',
+      emoji: '🅰️'
     }
   });
 
-  assert.equal(commands[0].command, 'lgtmrand');
+  assert.deepEqual(commands[0], {
+    command: 'alpha',
+    description: 'Alpha note...',
+    emoji: '🅰️'
+  });
   assert.deepEqual(commands[1], {
     command: 'review',
     description: 'Ready at ${timestamp}...',
     emoji: '✅'
   });
+  assert.deepEqual(commands[2], {
+    command: 'zebra',
+    description: 'Last one...',
+    emoji: '🦓'
+  });
+  assert.equal(commands[3].command, 'lgtmrand');
 });
 
 test('applyCommandTemplate replaces supported variables', () => {
