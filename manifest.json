@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "GitHub Mentions+",
 	"description": "Enhance GitHub @mention autocomplete by adding custom team members or external collaborators.",
-	"version": "1.1.10",
+	"version": "1.1.11",
 	"browser_specific_settings": {
 		"gecko": {
 			"id": "github-mentions-plus@example.com",
